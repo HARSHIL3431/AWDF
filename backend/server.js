@@ -56,3 +56,4 @@ mongoose.connect(config.mongoUri)
   });
 
 export default app;
+// Trigger nodemon restart for new .env variables
