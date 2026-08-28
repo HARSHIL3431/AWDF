@@ -24,10 +24,14 @@ export const taskController = {
   // POST /tasks
   createTask: async (req, res, next) => {
     try {
-      const { title, description, completed, priority } = req.body;
+      const { title, description, completed, priority } = req.body || {};
+
+      if (!title || typeof title !== 'string' || !title.trim()) {
+        return res.status(400).json({ error: "Title is required" });
+      }
 
       const newTask = await Task.create({
-        title,
+        title: title.trim(),
         description,
         completed,
         priority

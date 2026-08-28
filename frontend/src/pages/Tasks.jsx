@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { taskService } from '../services/taskService';
+import { authService } from '../services/authService';
+import AuthForm from '../Components/AuthForm';
 
-function Tasks() {
+function Tasks({ user, onLoginSuccess }) {
   const [tasks, setTasks] = useState([]);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -22,6 +24,9 @@ function Tasks() {
   }, []);
 
   const fetchTasks = useCallback(async () => {
+    const token = authService.getToken();
+    if (!token) return;
+
     try {
       setError(null);
       const data = await taskService.getAll();
@@ -32,13 +37,16 @@ function Tasks() {
   }, []);
 
   useEffect(() => {
+    const token = authService.getToken();
+    if (!token) return;
+
     const init = async () => {
       setLoading(true);
       await fetchTasks();
       setLoading(false);
     };
     init();
-  }, [fetchTasks]);
+  }, [fetchTasks, user]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -127,6 +135,11 @@ function Tasks() {
       setTogglingId(null);
     }
   };
+
+  const token = authService.getToken();
+  if (!token || !user) {
+    return <AuthForm onLoginSuccess={onLoginSuccess} />;
+  }
 
   const isBusy = submitting || deletingId !== null || togglingId !== null;
 

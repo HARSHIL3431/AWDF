@@ -1,3 +1,6 @@
+import dns from 'dns';
+dns.setDefaultResultOrder('ipv4first');
+
 import express from 'express';
 import mongoose from 'mongoose';
 import { config } from './src/config/config.js';
@@ -5,6 +8,7 @@ import { logger } from './src/middleware/logger.js';
 import { validateContentType } from './src/middleware/validateContentType.js';
 import { errorHandler } from './src/middleware/errorHandler.js';
 import taskRoutes from './src/routes/taskRoutes.js';
+import authRoutes from './src/routes/authRoutes.js';
 
 const app = express();
 
@@ -29,6 +33,7 @@ app.use(validateContentType);
 app.use(express.json());
 
 // 4. API Routes
+app.use('/', authRoutes);
 app.use('/tasks', taskRoutes);
 
 // 5. Custom 404 route handler for undefined routes
@@ -41,19 +46,18 @@ app.use((req, res, next) => {
 // 6. Centralized global error handling middleware (must be the last middleware)
 app.use(errorHandler);
 
-// Connect to MongoDB and then start Express server
+// Start Express server and connect to MongoDB
+app.listen(config.port, () => {
+  const timestamp = new Date().toISOString().split('.')[0] + 'Z';
+  console.log(`Server running in ${config.env} mode on port ${config.port} - ${timestamp}`);
+});
+
 mongoose.connect(config.mongoUri)
   .then(() => {
     console.log('MongoDB connected');
-    app.listen(config.port, () => {
-      const timestamp = new Date().toISOString().split('.')[0] + 'Z';
-      console.log(`Server running in ${config.env} mode on port ${config.port} - ${timestamp}`);
-    });
   })
   .catch((err) => {
     console.error(`MongoDB connection error: ${err.message}`);
-    process.exit(1);
   });
 
 export default app;
-// Trigger nodemon restart for new .env variables
