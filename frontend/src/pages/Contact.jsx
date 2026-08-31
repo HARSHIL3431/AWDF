@@ -8,13 +8,12 @@ function Contact() {
     <section className="contact-card">
       <div>
         <p className="eyebrow">Contact</p>
-        <h2>Send a Message</h2>
+        <h2>Send a Message <span className="accent-text">*</span></h2>
         <p className="muted">
           The input below is controlled by React state, so the preview and
           character count update in real time.
         </p>
       </div>
-
       <form className="contact-form" onSubmit={(event) => event.preventDefault()}>
         <label htmlFor="message">
           Message

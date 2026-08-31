@@ -1,0 +1,275 @@
+{
+  "info": {
+    "_postman_id": "8b52fb1c-ef88-466d-96df-7f9cf0f6df41",
+    "name": "Task Manager API Collection",
+    "description": "Postman Collection for AWDF Task Manager REST API with Express.js.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "GET Tasks - Success",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:5000/tasks",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "5000",
+          "path": [
+            "tasks"
+          ]
+        },
+        "description": "Retrieves the list of all tasks. Expected status: 200 OK."
+      },
+      "response": []
+    },
+    {
+      "name": "POST Task - Success",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"title\": \"Implement Authentication\",\n    \"description\": \"Add JWT-based user authentication and route protection.\",\n    \"completed\": false\n}"
+        },
+        "url": {
+          "raw": "http://localhost:5000/tasks",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "5000",
+          "path": [
+            "tasks"
+          ]
+        },
+        "description": "Creates a new task. Expected status: 201 Created."
+      },
+      "response": []
+    },
+    {
+      "name": "POST Task - Failure (Invalid Content-Type)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "text/plain",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"title\": \"Invalid Content-Type Task\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:5000/tasks",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "5000",
+          "path": [
+            "tasks"
+          ]
+        },
+        "description": "Fails because Content-Type is text/plain. Expected status: 400 Bad Request."
+      },
+      "response": []
+    },
+    {
+      "name": "POST Task - Failure (Missing Title)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"description\": \"Task with missing title\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:5000/tasks",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "5000",
+          "path": [
+            "tasks"
+          ]
+        },
+        "description": "Fails because title is missing. Expected status: 400 Bad Request."
+      },
+      "response": []
+    },
+    {
+      "name": "PUT Task - Success",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"title\": \"Updated Setup Node.js Server\",\n    \"completed\": false\n}"
+        },
+        "url": {
+          "raw": "http://localhost:5000/tasks/1",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "5000",
+          "path": [
+            "tasks",
+            "1"
+          ]
+        },
+        "description": "Updates an existing task by ID. Expected status: 200 OK."
+      },
+      "response": []
+    },
+    {
+      "name": "PUT Task - Failure (Invalid Content-Type)",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "text/plain",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"title\": \"Invalid Content-Type Update\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:5000/tasks/1",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "5000",
+          "path": [
+            "tasks",
+            "1"
+          ]
+        },
+        "description": "Fails because Content-Type is text/plain. Expected status: 400 Bad Request."
+      },
+      "response": []
+    },
+    {
+      "name": "PUT Task - Failure (Not Found)",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"title\": \"Update non-existent task\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:5000/tasks/999",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "5000",
+          "path": [
+            "tasks",
+            "999"
+          ]
+        },
+        "description": "Fails because task ID does not exist. Expected status: 404 Not Found."
+      },
+      "response": []
+    },
+    {
+      "name": "DELETE Task - Success",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:5000/tasks/2",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "5000",
+          "path": [
+            "tasks",
+            "2"
+          ]
+        },
+        "description": "Deletes a task by ID. Expected status: 200 OK."
+      },
+      "response": []
+    },
+    {
+      "name": "DELETE Task - Failure (Not Found)",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:5000/tasks/999",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "5000",
+          "path": [
+            "tasks",
+            "999"
+          ]
+        },
+        "description": "Fails because task ID does not exist. Expected status: 404 Not Found."
+      },
+      "response": []
+    },
+    {
+      "name": "Custom 404 Route",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:5000/invalid-url-path",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "5000",
+          "path": [
+            "invalid-url-path"
+          ]
+        },
+        "description": "Fails because route is not defined. Expected status: 404 Not Found."
+      },
+      "response": []
+    }
+  ]
+}

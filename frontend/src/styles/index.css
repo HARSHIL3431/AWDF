@@ -1,0 +1,167 @@
+/* ═══════════════════════════════════════════════════════
+   Global Theme — Bold Creative Designer Portfolio
+   ═══════════════════════════════════════════════════════ */
+
+/* Base (default) theme — playful dark designer palette */
+:root {
+  --text: #d7d4e3;
+  --text-h: #ffffff;
+  --text-dim: #9a95b3;
+
+  --bg: #0d0c12;
+  --bg-elev: #161320;
+  --surface: #171423;
+  --border: #2a2438;
+
+  --purple: #9d4dff;
+  --purple-bright: #b46bff;
+  --lime: #d7ff3f;
+  --cyan: #37e3ff;
+  --orange: #ff7a3d;
+  --pink: #ff5c9d;
+  --red: #ff4d5e;
+
+  --accent: var(--purple-bright);
+  --accent-bg: rgba(157, 77, 255, 0.16);
+  --accent-border: rgba(180, 107, 255, 0.55);
+
+  --code-bg: #201a30;
+  --code-text: #d7ff3f;
+
+  --shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.55);
+
+  --sans: 'Poppins', 'Segoe UI', 'Trebuchet MS', system-ui, sans-serif;
+  --heading: 'Space Grotesk', 'Poppins', 'Segoe UI', sans-serif;
+  --mono: 'Space Mono', Consolas, 'Liberation Mono', monospace;
+
+  color: var(--text);
+  background: var(--bg);
+  font-family: var(--sans);
+  font-size: 18px;
+  line-height: 1.55;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Explicit dark theme (matches the default :root palette) */
+html.theme-dark {
+  --text: #d7d4e3;
+  --text-h: #ffffff;
+  --text-dim: #9a95b3;
+  --bg: #0d0c12;
+  --bg-elev: #161320;
+  --surface: #171423;
+  --border: #2a2438;
+  --purple: #9d4dff;
+  --purple-bright: #b46bff;
+  --lime: #d7ff3f;
+  --cyan: #37e3ff;
+  --orange: #ff7a3d;
+  --pink: #ff5c9d;
+  --red: #ff4d5e;
+  --accent: var(--purple-bright);
+  --accent-bg: rgba(157, 77, 255, 0.16);
+  --accent-border: rgba(180, 107, 255, 0.55);
+  --code-bg: #201a30;
+  --code-text: #d7ff3f;
+  --shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.55);
+}
+
+/* Light theme — bright creative studio palette (opt-in via toggle) */
+html.theme-light {
+  --text: #3a3650;
+  --text-h: #14121f;
+  --text-dim: #6f6a86;
+
+  --bg: #faf8ff;
+  --bg-elev: #ffffff;
+  --surface: #ffffff;
+  --border: #e2dcf2;
+
+  --purple: #8a2cff;
+  --purple-bright: #7a1cff;
+  --lime: #a5c300;
+  --cyan: #00b8e0;
+  --orange: #f2601b;
+  --pink: #e0327f;
+  --red: #e0263a;
+
+  --accent: var(--purple);
+  --accent-bg: rgba(138, 44, 255, 0.12);
+  --accent-border: rgba(122, 28, 255, 0.4);
+
+  --code-bg: #efeaff;
+  --code-text: #6b2bff;
+
+  --shadow: 0 10px 30px -12px rgba(70, 50, 120, 0.18);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: var(--bg);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  overflow-x: hidden;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+  margin-top: 0;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--heading);
+  color: var(--text-h);
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+}
+
+a {
+  color: inherit;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+code {
+  font-family: var(--mono);
+  font-size: 0.9em;
+  background: var(--code-bg);
+  color: var(--code-text);
+  padding: 0.2rem 0.4rem;
+  border-radius: 0.45rem;
+}
+
+/* Respect users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
