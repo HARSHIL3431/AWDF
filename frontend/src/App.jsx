@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { NavLink, Route, Routes, Navigate } from 'react-router-dom';
 import './styles/App.css';
 import Home from './pages/Home';
-import Projects from './pages/Projects';
-import Contact from './pages/Contact';
-import Tasks from './pages/Tasks';
-import NotFound from './pages/NotFound';
 import { authService } from './services/authService';
+
+const Projects = lazy(() => import('./pages/Projects'));
+const Contact = lazy(() => import('./pages/Contact'));
+const Tasks = lazy(() => import('./pages/Tasks'));
+const NotFound = lazy(() => import('./pages/NotFound'));
 
 function App() {
   const [isDarkMode, setIsDarkMode] = useState(
@@ -84,14 +85,23 @@ function App() {
       </header>
 
       <main className="page-content">
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/projects" element={<Navigate to="/projects/HARSHIL3431" replace />} />
-          <Route path="/projects/:username" element={<Projects />} />
-          <Route path="/tasks" element={<Tasks user={user} onLoginSuccess={handleLoginSuccess} />} />
-          <Route path="/contact" element={<Contact />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <Suspense
+          fallback={
+            <div className="loading-container" role="status" aria-live="polite">
+              <div className="spinner" />
+              <p>Loading page...</p>
+            </div>
+          }
+        >
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/projects" element={<Navigate to="/projects/HARSHIL3431" replace />} />
+            <Route path="/projects/:username" element={<Projects />} />
+            <Route path="/tasks" element={<Tasks user={user} onLoginSuccess={handleLoginSuccess} />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Suspense>
       </main>
     </div>
   );

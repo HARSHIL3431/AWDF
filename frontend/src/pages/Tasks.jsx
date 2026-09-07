@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { taskService } from '../services/taskService';
 import { authService } from '../services/authService';
-import AuthForm from '../Components/AuthForm';
+
+const AuthForm = lazy(() => import('../Components/AuthForm'));
 
 function Tasks({ user, onLoginSuccess }) {
   const [tasks, setTasks] = useState([]);
@@ -138,7 +139,18 @@ function Tasks({ user, onLoginSuccess }) {
 
   const token = authService.getToken();
   if (!token || !user) {
-    return <AuthForm onLoginSuccess={onLoginSuccess} />;
+    return (
+      <Suspense
+        fallback={
+          <div className="loading-container" role="status" aria-live="polite">
+            <div className="spinner" />
+            <p>Loading authentication...</p>
+          </div>
+        }
+      >
+        <AuthForm onLoginSuccess={onLoginSuccess} />
+      </Suspense>
+    );
   }
 
   const isBusy = submitting || deletingId !== null || togglingId !== null;
