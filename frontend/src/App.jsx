@@ -8,6 +8,8 @@ const Projects = lazy(() => import('./pages/Projects'));
 const Contact = lazy(() => import('./pages/Contact'));
 const Tasks = lazy(() => import('./pages/Tasks'));
 const NotFound = lazy(() => import('./pages/NotFound'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 
 function App() {
   const [isDarkMode, setIsDarkMode] = useState(
@@ -98,6 +100,8 @@ function App() {
             <Route path="/projects" element={<Navigate to="/projects/HARSHIL3431" replace />} />
             <Route path="/projects/:username" element={<Projects />} />
             <Route path="/tasks" element={<Tasks user={user} onLoginSuccess={handleLoginSuccess} />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password/:token" element={<ResetPassword />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { NavLink } from 'react-router-dom';
 import { authService } from '../services/authService';
 
 function AuthForm({ onLoginSuccess }) {
@@ -101,6 +102,12 @@ function AuthForm({ onLoginSuccess }) {
             {isRegister ? '← Switch to Login' : 'Need an Account? Register'}
           </button>
         </div>
+
+        {!isRegister && (
+          <p className="muted auth-switch" style={{ marginTop: '12px', textAlign: 'center' }}>
+            <NavLink to="/forgot-password" style={{ color: 'inherit' }}>Forgot Password?</NavLink>
+          </p>
+        )}
       </form>
     </section>
   );

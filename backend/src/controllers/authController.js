@@ -1,7 +1,9 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import User from '../models/userModel.js';
 import { config } from '../config/config.js';
+import { sendPasswordResetEmail } from '../services/emailService.js';
 
 export const authController = {
   // POST /register
@@ -108,6 +110,96 @@ export const authController = {
       }
 
       res.status(200).json(user.toJSON());
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  // POST /forgot-password
+  forgotPassword: async (req, res, next) => {
+    try {
+      const { email } = req.body || {};
+
+      if (!email || typeof email !== 'string' || !email.trim()) {
+        return res.status(400).json({ error: 'Email is required' });
+      }
+
+      const normalizedEmail = email.trim().toLowerCase();
+
+      // Find user by email (but don't reveal if user exists)
+      const user = await User.findOne({ email: normalizedEmail });
+
+      // Always return success message to prevent account enumeration
+      const genericResponse = {
+        message: 'If an account exists for this email, a password reset link has been sent.'
+      };
+
+      if (!user) {
+        return res.status(200).json(genericResponse);
+      }
+
+      // Generate cryptographically secure reset token
+      const resetToken = crypto.randomBytes(32).toString('hex');
+
+      // Hash token before storing
+      const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+
+      // Set expiration (15 minutes)
+      const expires = new Date(Date.now() + 15 * 60 * 1000);
+
+      // Save hashed token and expiration to user
+      user.resetPasswordToken = hashedToken;
+      user.resetPasswordExpires = expires;
+      await user.save();
+
+      // Send reset email
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      const emailResult = await sendPasswordResetEmail(user.email, resetToken, frontendUrl);
+
+      if (!emailResult.success) {
+        // Don't reveal email failure to user, but log it
+        console.error('Failed to send password reset email:', emailResult.error);
+      }
+
+      res.status(200).json(genericResponse);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  // POST /reset-password/:token
+  resetPassword: async (req, res, next) => {
+    try {
+      const { token } = req.params;
+      const { password } = req.body || {};
+
+      if (!password || typeof password !== 'string' || !password.trim()) {
+        return res.status(400).json({ error: 'Password is required' });
+      }
+
+      // Hash the received token to compare with stored hash
+      const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+      // Find user with matching hashed token and valid expiration
+      const user = await User.findOne({
+        resetPasswordToken: hashedToken,
+        resetPasswordExpires: { $gt: new Date() }
+      });
+
+      if (!user) {
+        return res.status(400).json({ error: 'Invalid or expired reset token' });
+      }
+
+      // Hash new password
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      // Update password and clear reset token fields
+      user.password = hashedPassword;
+      user.resetPasswordToken = undefined;
+      user.resetPasswordExpires = undefined;
+      await user.save();
+
+      res.status(200).json({ message: 'Password reset successfully' });
     } catch (error) {
       next(error);
     }
