@@ -1,8 +1,9 @@
 import { useEffect, useState, lazy, Suspense } from 'react';
-import { NavLink, Route, Routes, Navigate } from 'react-router-dom';
+import { Route, Routes, Navigate } from 'react-router-dom';
 import './styles/App.css';
 import Home from './pages/Home';
 import { authService } from './services/authService';
+import { ExpandableActionBar } from './Components/ExpandableActionBar';
 
 const Projects = lazy(() => import('./pages/Projects'));
 const Contact = lazy(() => import('./pages/Contact'));
@@ -51,14 +52,7 @@ function App() {
           <h1 className="site-title">Harshil Thakkar</h1>
         </div>
 
-        <nav className="nav-links" aria-label="Primary navigation">
-          <NavLink to="/" end>
-            Home
-          </NavLink>
-          <NavLink to="/projects">Projects</NavLink>
-          <NavLink to="/tasks">Tasks</NavLink>
-          <NavLink to="/contact">Contact</NavLink>
-        </nav>
+        <ExpandableActionBar />
 
         <div className="header-actions">
           {user && (

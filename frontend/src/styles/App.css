@@ -89,6 +89,106 @@
   box-shadow: 0 0 0 1px var(--accent-border), 0 8px 22px -8px rgba(157, 77, 255, 0.55);
 }
 
+/* Expandable Action Bar */
+.expandable-action-bar {
+  display: flex;
+  align-items: center;
+}
+
+.action-bar-items {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.action-bar-item {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.95rem;
+  text-decoration: none;
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  white-space: nowrap;
+  overflow: hidden;
+  transition:
+    transform 170ms ease,
+    border-color 170ms ease,
+    color 170ms ease,
+    background-color 170ms ease,
+    box-shadow 170ms ease,
+    gap 170ms ease;
+}
+
+.action-bar-item:hover {
+  transform: translateY(-2px);
+  color: var(--text-h);
+  border-color: var(--cyan);
+  box-shadow: 0 6px 18px -6px rgba(55, 227, 255, 0.45);
+  gap: 10px;
+}
+
+.action-bar-item.active {
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
+  color: var(--text-h);
+  box-shadow: 0 0 0 1px var(--accent-border), 0 8px 22px -8px rgba(157, 77, 255, 0.55);
+}
+
+.action-bar-item:focus-visible {
+  outline: none;
+  border-color: var(--accent-border);
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
+
+.action-bar-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  color: inherit;
+  transition: color 170ms ease;
+}
+
+.action-bar-icon-svg {
+  width: 20px;
+  height: 20px;
+}
+
+.action-bar-item:hover .action-bar-icon,
+.action-bar-item.active .action-bar-icon {
+  color: var(--text-h);
+}
+
+.action-bar-label {
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .action-bar-item {
+    padding: 10px 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .action-bar-item,
+  .action-bar-label {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
 .theme-toggle,
 .form-button,
 .cta-link {
