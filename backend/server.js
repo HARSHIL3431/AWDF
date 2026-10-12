@@ -9,6 +9,8 @@ import { validateContentType } from './src/middleware/validateContentType.js';
 import { errorHandler } from './src/middleware/errorHandler.js';
 import taskRoutes from './src/routes/taskRoutes.js';
 import authRoutes from './src/routes/authRoutes.js';
+import { authenticateToken } from './src/middleware/authMiddleware.js';
+import { cacheService } from './src/services/cacheService.js';
 
 const app = express();
 
@@ -36,12 +38,19 @@ app.use(express.json());
 app.use('/', authRoutes);
 app.use('/tasks', taskRoutes);
 
+// Debug endpoint for cache statistics (protected with authenticateToken)
+app.get('/debug/cache-stats', authenticateToken, (req, res) => {
+  res.status(200).json(cacheService.getStats());
+});
+
+
 // 5. Custom 404 route handler for undefined routes
 app.use((req, res, next) => {
   res.status(404).json({
     error: "Route not found"
   });
 });
+
 
 // 6. Centralized global error handling middleware (must be the last middleware)
 app.use(errorHandler);
