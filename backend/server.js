@@ -11,8 +11,15 @@ import taskRoutes from './src/routes/taskRoutes.js';
 import authRoutes from './src/routes/authRoutes.js';
 import { authenticateToken } from './src/middleware/authMiddleware.js';
 import { cacheService } from './src/services/cacheService.js';
+import { registerTaskListeners } from './src/events/taskListeners.js';
 
 const app = express();
+
+// Practical 10: register background notification listeners exactly ONCE at
+// startup (the function is idempotent). Events are emitted by the task
+// controllers; the notification handlers live in src/events/taskListeners.js
+// so route code stays decoupled from notification logic.
+registerTaskListeners();
 
 // 1. Global logging middleware (logs method, url, timestamp)
 app.use(logger);

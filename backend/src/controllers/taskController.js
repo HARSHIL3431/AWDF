@@ -1,5 +1,19 @@
 import Task from '../models/taskModel.js';
 import { cacheService } from '../services/cacheService.js';
+import { safeEmit } from '../events/taskEvents.js';
+
+/**
+ * Evidence logging for response initiation (Practical 10). Guarded so a
+ * stdout failure can never turn an already-successful database operation into
+ * an error response — logging must stay off the critical response path.
+ */
+function logApiEvent(message) {
+  try {
+    console.log(message);
+  } catch {
+    // logging unavailable — the response path is unaffected
+  }
+}
 
 export const taskController = {
   // GET /tasks
@@ -49,7 +63,26 @@ export const taskController = {
       // Invalidate all tasks cache
       cacheService.invalidateTaskCaches();
 
+      // Evidence log: response initiation timestamp, written immediately
+      // BEFORE the response method is called (the client receives the bytes
+      // slightly later — measure that separately on the client).
+      logApiEvent(`[API] POST /tasks response initiation at ${new Date().toISOString()} (status 201)`);
       res.status(201).json(newTask);
+
+      // Practical 10: emit AFTER the existing 201 response has been initiated.
+      // Listeners run synchronously up to their first await, then hand off to a
+      // non-blocking timer — the client never waits for notification work, and
+      // `safeEmit` guarantees a listener failure cannot alter this response.
+      // Payload is built from the PERSISTED task, not the request body, and
+      // carries only what the notification needs.
+      safeEmit('task-created', {
+        taskId: newTask?.id ?? null,
+        title: newTask?.title ?? null,
+        // The task schema defines no assignment field, so tasks are unassigned;
+        // the listener handles this case gracefully.
+        assignedUserId: null,
+        createdBy: req.user?.id ?? null
+      });
     } catch (error) {
       next(error);
     }
@@ -93,8 +126,20 @@ export const taskController = {
       // Invalidate cache for task list and the deleted task
       cacheService.invalidateTaskCaches(id);
 
+      // Evidence log: response initiation timestamp (see createTask above).
+      logApiEvent(`[API] DELETE /tasks/:id response initiation at ${new Date().toISOString()} (status 200)`);
       res.status(200).json({
         message: "Task deleted successfully"
+      });
+
+      // Practical 10: emit AFTER the existing delete response. Only emitted
+      // when the deletion actually succeeded (the 404 branch returns first).
+      // `deletedTask` holds the record captured by findByIdAndDelete, so the
+      // notification data does not require a second query.
+      safeEmit('task-deleted', {
+        taskId: deletedTask?.id ?? id,
+        title: deletedTask?.title ?? null,
+        deletedBy: req.user?.id ?? null
       });
     } catch (error) {
       next(error);
