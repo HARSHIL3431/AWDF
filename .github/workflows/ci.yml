@@ -1,0 +1,93 @@
+# Practical 12 — GitHub Actions CI for the Task Management stack.
+#
+# Scope: CONTINUOUS INTEGRATION only. This pipeline installs dependencies,
+# runs the automated tests, lints and builds the frontend. It deploys nothing
+# and needs no secrets: every job runs with read-only repository permissions.
+#
+# Triggers:
+#   - push to `main`
+#   - pull request targeting `main`   (so feature branches are verified before
+#     they can be merged; a red X blocks the merge)
+#
+# Layout (two independent jobs, so a failure names itself immediately):
+#   backend-tests      -> npm install (backend)  -> npm test
+#   frontend-checks    -> npm install (frontend) -> lint -> build
+#
+# Node.js 24 matches the runtime this project is developed against (Node 24.12)
+# and satisfies every dependency's engines range (vite ^20.19 || >=22.12,
+# mongoose >=20.19). Node 18 would NOT satisfy vite.
+#
+# The integration suite (`npm run test:integration`) is deliberately NOT run
+# here: it is gated by a database safety guard that requires an explicitly
+# approved `*_test` TEST_MONGO_URI together with RUN_INTEGRATION_TESTS=1.
+# CI must never bypass that guard, so it runs the safe suite only.
+
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Least privilege: the jobs only read the checked-out repository.
+permissions:
+  contents: read
+
+jobs:
+  backend-tests:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies (npm install)
+        working-directory: backend
+        run: npm install
+
+      # Guard: a glob that matches nothing would silently run 0 tests and
+      # still exit 0 (green while testing nothing). Fail loudly instead.
+      # The glob is intentionally NOT a directory scan: scanning backend/test
+      # recursively would also pick up the gated integration suite.
+      - name: Verify test files are present
+        run: ls -1 backend/test/*.test.js
+
+      # `npm test` is the configured test script of the root package.json.
+      # It runs Node's built-in test runner over backend/test/*.test.js; a
+      # failing assertion exits non-zero and GitHub marks the job red.
+      - name: Run automated tests (npm test)
+        run: npm test
+
+  frontend-checks:
+    name: Frontend lint and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies (npm install)
+        working-directory: frontend
+        run: npm install
+
+      - name: Lint frontend (npm run frontend:lint)
+        run: npm run frontend:lint
+
+      - name: Build frontend (npm run frontend:build)
+        run: npm run frontend:build
