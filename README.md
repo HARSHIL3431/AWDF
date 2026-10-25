@@ -1,5 +1,7 @@
 # Student Portfolio — Full Stack Task Manager
 
+[![CI Pipeline](https://github.com/HARSHIL3431/AWDF/actions/workflows/ci.yml/badge.svg)](https://github.com/HARSHIL3431/AWDF/actions/workflows/ci.yml)
+
 React + Express + MongoDB Atlas full-stack application.
 
 ## Prerequisites
@@ -47,10 +49,46 @@ npm run dev
 | DELETE | /tasks/:id          | Delete a task (Invalidates affected caches)  |
 | GET    | /debug/cache-stats  | Cache statistics (hits, misses, hit rate)    |
 
+## Docker (Practical 11)
+
+The whole stack — React frontend, Express backend and MongoDB — starts with one
+command from the repository root:
+
+```bash
+docker compose up --build
+```
+
+| Service   | Container port | Host port | What runs inside                                  |
+|-----------|----------------|-----------|---------------------------------------------------|
+| `frontend`| 5173           | 5173      | `vite preview` serving the production bundle       |
+| `backend` | 5000           | 5000      | REST API (the browser-visible API endpoint)        |
+| `mongodb` | 27017          | 27017     | MongoDB 7 with the named volume `mongo_data`        |
+
+Prerequisite (identical to local development): `backend/.env` must exist —
+create it once from `backend/.env.example`. Compose overrides only
+`MONGO_URI=mongodb://mongodb:27017/task_manager` and `PORT=5000` inside the
+container, so the three services reach each other by Compose service name on
+the `app-network` bridge network.
+
+Host `node_modules`, `.env` and `.git` are excluded by the `.dockerignore`
+files, so no credentials and no host dependencies enter an image.
+
+```bash
+docker compose ps            # service status and health
+docker compose logs -f backend
+docker compose stop          # stop containers, KEEP all MongoDB data
+docker compose down          # remove containers, KEEP the mongo_data volume
+docker compose down -v       # deletes the database volume — never part of setup
+```
+
+Details, verification results and troubleshooting:
+[docs/practical-11-docker.md](docs/practical-11-docker.md).
+
 ## Documentation
 - [Practical 8 Docs](docs/practical-8.md)
 - [Practical 9 In-Memory Caching & Query Optimization](docs/practical-9.md)
 - [Practical 10 Asynchronous Event-Driven Notifications](docs/practical-10-events.md)
+- [Practical 11 Docker Containerization & Compose](docs/practical-11-docker.md)
 
 ## Running Tests
 

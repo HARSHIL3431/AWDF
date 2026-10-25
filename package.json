@@ -8,6 +8,7 @@
     "backend:dev": "npm --prefix backend run dev",
     "backend:start": "npm --prefix backend run start",
     "dev": "start cmd /c \"npm run backend:dev\" && npm run frontend:dev",
-    "start": "npm run backend:start"
+    "start": "npm run backend:start",
+    "test": "node --test \"backend/test/*.test.js\""
   }
 }

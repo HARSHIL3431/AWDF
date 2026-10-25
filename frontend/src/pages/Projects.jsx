@@ -2,13 +2,13 @@ import { useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { useGitHubData } from '../hooks/useGitHubData';
 import { getUniqueLanguages, sortRepos, filterRepos } from '../utils/githubUtils';
-import GitHubProfile from '../components/Projects/GitHubProfile';
-import StatsSection from '../components/Projects/StatsSection';
-import Toolbar from '../components/Projects/Toolbar';
-import RepositoryList from '../components/Projects/RepositoryList';
-import LoadingSkeleton from '../components/Projects/LoadingSkeleton';
-import ErrorState from '../components/Projects/ErrorState';
-import EmptyState from '../components/Projects/EmptyState';
+import GitHubProfile from '../Components/Projects/GitHubProfile';
+import StatsSection from '../Components/Projects/StatsSection';
+import Toolbar from '../Components/Projects/Toolbar';
+import RepositoryList from '../Components/Projects/RepositoryList';
+import LoadingSkeleton from '../Components/Projects/LoadingSkeleton';
+import ErrorState from '../Components/Projects/ErrorState';
+import EmptyState from '../Components/Projects/EmptyState';
 import '../styles/Projects.css';
 
 /**

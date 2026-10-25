@@ -1,6 +1,7 @@
 import { authService } from './authService';
 
-const API_URL = 'http://localhost:5000/tasks';
+// Same browser-reachable backend base URL as authService (see its comment).
+const API_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/tasks`;
 
 const getAuthHeaders = () => {
   const token = authService.getToken();

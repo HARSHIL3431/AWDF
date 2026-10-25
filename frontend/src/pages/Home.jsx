@@ -1,7 +1,7 @@
-import Header from '../components/Header';
-import About from '../components/About';
-import Skills from '../components/Skills';
-import Footer from '../components/Footer';
+import Header from '../Components/Header';
+import About from '../Components/About';
+import Skills from '../Components/Skills';
+import Footer from '../Components/Footer';
 
 const skills = [
   'HTML',

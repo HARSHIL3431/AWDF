@@ -1,0 +1,30 @@
+# Root build context ignore rules (no service currently uses the repository
+# root as its build context — frontend/ and backend/ have their own — but the
+# rules are kept here so any future root-context build stays safe).
+.git
+node_modules
+**/node_modules
+
+# Never ship local environment files or their derivatives; keep the templates.
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Local-only, non-source content (including a credentials file).
+practical files
+GitHub token.txt
+
+# Generated output and noise.
+dist
+**/dist
+coverage
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+*.local
+.DS_Store
