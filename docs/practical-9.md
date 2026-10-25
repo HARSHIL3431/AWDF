@@ -77,3 +77,12 @@ Tested on Node.js v22+, Express, and MongoDB Atlas (Cloud Cluster):
 
 ### 5.3 Server Restart Behavior
 - Since cache resides in RAM, restarting the Node.js process clears all cache entries. On startup, the first read requests will naturally register as cache misses and re-warm the cache from MongoDB.
+
+---
+
+## 6. Independent Verification (2026-10-25)
+
+A requirement-by-requirement audit of this practical is available at [docs/practical-9-audit.md](practical-9-audit.md). It adds:
+
+- **14 automated cache tests** in `backend/test/cache.test.js` (miss/hit, DB-query avoidance, empty-result caching, error non-caching, per-id isolation, response-shape parity, POST/PUT/DELETE invalidation, statistics math, TTL expiry, endpoint token guard) — all passing within `npm test` (123/123).
+- **An independently measured, read-only benchmark** (3 rounds, miss/hit confirmed via `/debug/cache-stats` deltas): uncached avg **70.17 ms**, cached avg **2.08 ms**, time saved **68.09 ms**, reduction **97.03 %** — the same order of magnitude as the readings recorded in §4 above.
