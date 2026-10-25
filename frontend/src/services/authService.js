@@ -1,4 +1,9 @@
-const API_URL = 'http://localhost:5000';
+// Backend base URL. The BROWSER calls the API, so this must be a
+// browser-reachable address (a Compose service name such as "backend" would
+// not resolve on the host). Vite inlines VITE_* values at build time — the
+// Docker image passes VITE_API_URL as a build arg — and the fallback keeps
+// local development exactly as it was.
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export const authService = {
   getToken: () => localStorage.getItem('jwt_token'),
