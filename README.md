@@ -50,6 +50,7 @@ npm run dev
 ## Documentation
 - [Practical 8 Docs](docs/practical-8.md)
 - [Practical 9 In-Memory Caching & Query Optimization](docs/practical-9.md)
+- [Practical 10 Asynchronous Event-Driven Notifications](docs/practical-10-events.md)
 
 ## Running Tests
 
@@ -58,6 +59,7 @@ npm run dev
 cd backend
 node test_backend.js       # Practical 7 & Auth tests
 node test_practical9.js    # Practical 9 Cache & Benchmark tests
+node test_practical10.js   # Practical 10 event-driven notification demo
 
 # Frontend lint
 cd frontend && npm run lint
