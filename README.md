@@ -1,5 +1,7 @@
 # Student Portfolio — Full Stack Task Manager
 
+[![CI Pipeline](https://github.com/HARSHIL3431/AWDF/actions/workflows/ci.yml/badge.svg)](https://github.com/HARSHIL3431/AWDF/actions/workflows/ci.yml)
+
 React + Express + MongoDB Atlas full-stack application.
 
 ## Prerequisites
