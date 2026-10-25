@@ -1,0 +1,20 @@
+# Build context for backend/Dockerfile — keep it to what the image needs.
+node_modules
+.env
+.env.*
+!.env.example
+.git
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+coverage
+*.log
+
+# Not required to run the server (tests run on the host, per README).
+test
+test_*.js
+postman_test_cases.json
+
+# Docker files themselves are not part of the image content.
+Dockerfile
+.dockerignore

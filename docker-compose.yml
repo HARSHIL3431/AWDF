@@ -1,0 +1,125 @@
+# Practical 11 — Docker Compose: frontend + backend + MongoDB
+#
+# Single-command startup:   docker compose up --build
+# Stop, keeping all data:   docker compose stop        (or: docker compose down)
+#
+# Topology (browser perspective):
+#
+#   Host browser  ->  localhost:5173 (frontend container, Vite preview)
+#                  ->  localhost:5000 (backend  container, Express API)
+#   frontend container  -X->  backend   (the bundle runs in the BROWSER, so it
+#                                   uses the host-published port, not the
+#                                   Compose service name)
+#   backend container   --->  mongodb:27017 (Compose service DNS on app-network)
+#
+# Environment handling:
+#   - backend/.env (git-ignored, never copied into the image) supplies JWT,
+#     SMTP, NODE_ENV, FRONTEND_URL and the job encryption key, exactly as
+#     local development uses them. It is required — create it once from
+#     backend/.env.example if it does not exist.
+#   - `environment` below overrides only the two container-specific values.
+#     Precedence in Compose is: environment > env_file, so the MongoDB URI
+#     inside the container is always the Compose service name.
+
+name: task-management
+
+services:
+  # ---------------------------------------------------------------- frontend
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # URL the BROWSER uses to reach the API. The default is the
+        # host-published backend port; override for other deployments.
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:5000}
+    image: task-management-frontend:latest
+    ports:
+      - "5173:5173" # host:container — vite preview listens on 5173 inside
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      # node:24-slim ships no curl/wget, so use Node's built-in fetch.
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:5173/').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - app-network
+
+  # ----------------------------------------------------------------- backend
+  backend:
+    build:
+      context: ./backend
+    image: task-management-backend:latest
+    ports:
+      - "5000:5000" # host:container — config.port default is 5000
+    # Real local configuration (JWT_SECRET, JOB_PAYLOAD_ENCRYPTION_KEY,
+    # EMAIL_*, NODE_ENV, FRONTEND_URL). Read at `docker compose up` time from
+    # the host; it is NOT part of the build context and NOT baked into layers.
+    env_file:
+      - ./backend/.env
+    environment:
+      # Always the Compose service name — never localhost, which would mean
+      # "this container itself" from inside the backend container.
+      MONGO_URI: mongodb://mongodb:27017/task_manager
+      PORT: 5000
+    depends_on:
+      mongodb:
+        # depends_on alone only orders the start; the health check is what
+        # guarantees MongoDB actually accepts connections first.
+        condition: service_healthy
+    healthcheck:
+      # Any HTTP response from the API (including the 404 handler) proves the
+      # server is accepting requests; no curl/wget is needed for this.
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:5000/').then(() => process.exit(0), () => process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - app-network
+
+  # ----------------------------------------------------------------- mongodb
+  mongodb:
+    # Explicit, pinned major version. Contains mongosh, used by the health
+    # check below. MongoDB is required — it is not replaced by another DB.
+    image: mongo:7.0
+    ports:
+      - "27017:27017" # host-side access for inspection; free on this machine
+    volumes:
+      # Named volume => data survives `docker compose down`, rebuilds and
+      # container recreation. Only `docker compose down -v` deletes it, which
+      # must never be part of normal verification.
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    networks:
+      - app-network
+
+# All three services share this user-defined bridge network. `name:` pins the
+# actual Docker network name to "app-network" as the practical requires.
+networks:
+  app-network:
+    name: app-network
+    driver: bridge
+
+volumes:
+  mongo_data:
