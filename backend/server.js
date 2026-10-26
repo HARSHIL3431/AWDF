@@ -9,6 +9,7 @@ import { validateContentType } from './src/middleware/validateContentType.js';
 import { errorHandler } from './src/middleware/errorHandler.js';
 import taskRoutes from './src/routes/taskRoutes.js';
 import authRoutes from './src/routes/authRoutes.js';
+import aiRoutes from './src/routes/aiRoutes.js';
 import { authenticateToken } from './src/middleware/authMiddleware.js';
 import { cacheService } from './src/services/cacheService.js';
 import { registerTaskListeners } from './src/events/taskListeners.js';
@@ -44,6 +45,11 @@ app.use(express.json());
 // 4. API Routes
 app.use('/', authRoutes);
 app.use('/tasks', taskRoutes);
+// Practical 13: AI description helper for the task form. The app has no
+// global /api prefix, so this router is mounted at /api/ai, making the
+// endpoint resolve to exactly /api/ai/generate-description. Existing routes
+// and their authentication policy are untouched.
+app.use('/api/ai', aiRoutes);
 
 // Debug endpoint for cache statistics (protected with authenticateToken)
 app.get('/debug/cache-stats', authenticateToken, (req, res) => {
