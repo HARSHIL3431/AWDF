@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { taskService } from '../services/taskService';
 import { authService } from '../services/authService';
+import { aiService } from '../services/aiService';
 
 const AuthForm = lazy(() => import('../Components/AuthForm'));
 
@@ -10,6 +11,13 @@ function Tasks({ user, onLoginSuccess }) {
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState('medium');
   const [editingTaskId, setEditingTaskId] = useState(null);
+
+  // Practical 13 — AI description suggestion. `generating` blocks duplicate
+  // requests while one is in flight; `aiSuggestion` tracks whether the current
+  // description text came from the provider so the review disclaimer can be
+  // shown until the form is reset.
+  const [generating, setGenerating] = useState(false);
+  const [aiSuggestion, setAiSuggestion] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -72,6 +80,7 @@ function Tasks({ user, onLoginSuccess }) {
       setTitle('');
       setDescription('');
       setPriority('medium');
+      setAiSuggestion(false);
       await fetchTasks();
     } catch (err) {
       setError(err.message);
@@ -81,11 +90,45 @@ function Tasks({ user, onLoginSuccess }) {
     }
   };
 
+  // Practical 13 — ask the BACKEND to generate a suggestion. The browser never
+  // contacts OpenAI/Gemini and only ever sends the typed title. The result is
+  // placed in the editable description field; nothing is created or saved
+  // until the user presses "Add Task" themselves.
+  const handleGenerateDescription = async () => {
+    const cleanTitle = title.trim();
+    if (!cleanTitle) {
+      const message = 'Enter a task title before generating a description';
+      setError(message);
+      showToast(message, 'error');
+      return;
+    }
+    if (generating) return; // one request at a time
+
+    setGenerating(true);
+    setError(null);
+    try {
+      const data = await aiService.generateDescription(cleanTitle);
+      setDescription(data.description);
+      setAiSuggestion(true);
+      showToast(data.message || 'AI suggestion inserted — review before using', 'success');
+    } catch (err) {
+      // Provider unavailable / rate-limited / invalid input: the manual path
+      // stays fully usable. `err.message` is the backend's own human-readable
+      // text — never raw JSON, a stack trace or provider detail.
+      setAiSuggestion(false);
+      setError(err.message);
+      showToast(err.message, 'error');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   const handleStartEdit = (task) => {
     setEditingTaskId(task.id);
     setTitle(task.title);
     setDescription(task.description || '');
     setPriority(task.priority || 'medium');
+    setAiSuggestion(false);
     setError(null);
   };
 
@@ -94,6 +137,7 @@ function Tasks({ user, onLoginSuccess }) {
     setTitle('');
     setDescription('');
     setPriority('medium');
+    setAiSuggestion(false);
     setError(null);
   };
 
@@ -205,6 +249,29 @@ function Tasks({ user, onLoginSuccess }) {
                 disabled={submitting}
               />
             </label>
+
+            <div className="action-row">
+              <button
+                type="button"
+                className="form-button form-button--ghost"
+                onClick={handleGenerateDescription}
+                disabled={generating || submitting}
+                aria-busy={generating}
+              >
+                {generating ? 'Generating...' : 'Generate description'}
+              </button>
+              {generating && (
+                <span className="muted" role="status" aria-live="polite">
+                  Generating suggestion...
+                </span>
+              )}
+            </div>
+
+            {aiSuggestion && (
+              <p className="muted" role="note" aria-live="polite" style={{ margin: 0 }}>
+                AI-generated suggestion — review and edit before using.
+              </p>
+            )}
 
             <label htmlFor="priority">
               Priority
