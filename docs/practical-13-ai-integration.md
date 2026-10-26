@@ -196,6 +196,9 @@ retained), then mapped by the controller to the single 503 fallback body.
 | Anything unforeseen thrown by the service | controller `catch` | 503 fallback |
 | Broken response body access | outer `catch` -> `next(error)` | existing centralised error handler |
 
+The quota row is the one observed live (see section 11); every other row is
+covered by the mocked tests.
+
 Logging is intentionally minimal: only the error **name** and **code** are
 logged (`[ai] description generation failed: AiServiceError (timeout)`), never
 the provider message, never request headers, never the key.
@@ -325,6 +328,12 @@ OPENAI_API_KEY=<your key>
 The key is read at request time from `process.env`, so a restart of the backend
 is enough; no rebuild is required and no key is baked into the image.
 
+Beware of precedence: the loader does not overwrite a variable that is already
+present in the process environment, so an `OPENAI_API_KEY` exported in the shell
+(or stored as an OS user variable) silently wins over `backend/.env`. That is
+convenient for a real key and surprising when demonstrating the missing-key path
+- clear it for that process (section 12) if you want the "not configured" case.
+
 ---
 
 ## 10. Tests
@@ -411,8 +420,15 @@ intentional and was not bypassed.
 The automated tests mount the router themselves, so the `server.js` mount was
 also verified live, against the **real application** started on a spare port
 (`PORT=5099`) with the real `backend/.env` and a locally reachable MongoDB.
-No AI key was configured for this run, no task was created, and no secret or
-token appears in the output below.
+No task was created, and no secret or token appears in the output below.
+
+One detail matters for honesty: `backend/.env` contains **no** provider key, but
+this Windows account has `OPENAI_API_KEY` set as a user environment variable, and
+the process inherited it. The request therefore really did travel to OpenAI and
+came back **HTTP 429 (quota)** in 394 ms, which the service logged as
+`[ai] description generation failed: AiServiceError (quota)` and translated into
+the fallback below. So this run is a genuine end-to-end demonstration of the
+provider-failure path - not a simulated one - even though it produced no AI text.
 
 ```
 POST /api/ai/generate-description  (no token)
@@ -443,8 +459,13 @@ response body. Script exit code: `0`.
 
 This proves, end to end and with the production wiring: the documented path
 exists on the real server, authentication and the limiter run in the intended
-order, provider absence degrades gracefully instead of crashing, and existing
-endpoints are unaffected.
+order, a real provider rejection degrades gracefully instead of crashing, and
+existing endpoints are unaffected.
+
+What this run does **not** prove: that the provider produces good text. The
+configured key is quota-exhausted (HTTP 429), so no suggestion was ever returned
+in this environment and no successful generation is claimed anywhere in this
+document.
 
 ### Docker-container verification: pending
 
@@ -455,9 +476,10 @@ specified`). The stack itself was therefore **not** re-verified for this
 practical and is recorded as pending rather than claimed. No destructive Docker
 command was run and the MongoDB data volume was not touched.
 
-**No live AI call was made**: no provider key is configured in this workspace, so
-the only real provider-facing outcome observed was the graceful 503 fallback. A
-"screenshot of a real AI suggestion" can only be produced after adding a key.
+**One real provider request was made** (inherited OS environment key) and it was
+rejected with HTTP 429 quota, which is the degradation shown above. No successful
+generation was observed, and a "screenshot of a real AI suggestion" therefore
+still requires a key with remaining quota.
 
 ---
 
@@ -474,12 +496,25 @@ is demonstrable without any key:
    works**.
 4. Press the button twice in a row: the second request returns 429 and the UI
    reports that a suggestion was already generated, without breaking the form.
-5. Network-level failure can be shown the same way by setting an unreachable
-   `OPENAI_MODEL`-independent condition (e.g. disabling the network), because the
-   8 s timeout and the transport error both map to the same fallback.
+5. Network-level failure looks the same: with the network disabled, the transport
+   error and the 8 s timeout both map to the same fallback.
+6. An exhausted-quota key also produces the same 503, because a provider `429`
+   maps to it - this is exactly what the live run above hit.
 
-The same behaviour at the API level is the `503` / `429` output quoted in
-section 11.
+**Environment precedence (important when reproducing):** the loader does not
+overwrite variables that already exist in the process environment, so a key
+exported in the shell or stored as an OS user variable takes precedence over
+`backend/.env`. On such a machine, clear it for that one process to see the
+missing-key path:
+
+```powershell
+$env:OPENAI_API_KEY = ''
+npm run dev
+```
+
+```bash
+OPENAI_API_KEY= npm run dev
+```
 
 ---
 
@@ -524,8 +559,9 @@ feature then simply reports itself unavailable, which is a supported state.
 5. **Provider parity is by contract, not by benchmark.** Both providers are
    tested with the same mocked contract; output quality differences between
    models were not evaluated.
-6. **No live provider call was made here**, so the exact wording produced by the
-   model in this environment is unverified (see section 11).
+6. **No successful live generation was observed here.** The only real provider
+   round-trip returned HTTP 429 (quota), so the wording the model would actually
+   produce in this environment is unverified (see section 11).
 7. **Docker container re-verification is pending** because the Docker daemon was
    unavailable during this practical.
 8. **Frontend behaviour is not covered by an automated UI test** (the project has
@@ -539,15 +575,16 @@ feature then simply reports itself unavailable, which is a supported state.
 ## 15. Screenshot / evidence placeholders
 
 The screenshots below have **not** been captured in this workspace (Docker was
-down and no provider key is configured). They are listed so they can be added
-when a demo environment is available - no image is invented here.
+down, and the only available provider key is quota-exhausted). They are listed so
+they can be added when a demo environment is available - no image is invented
+here.
 
 | # | What to capture | How to produce it | Status |
 | --- | --- | --- | --- |
 | 1 | New Task form with the **Generate description** button | `npm run dev`, log in, open the task form | Not captured |
 | 2 | Loading state: "Generating..." while the request is in flight | throttle the network in devtools, press the button | Not captured |
-| 3 | Successful suggestion in the description field with the disclaimer | requires a real provider key in `backend/.env` | Not captured (no key) |
-| 4 | Graceful fallback message with an empty key | leave `OPENAI_API_KEY=` empty, press the button | Not captured |
+| 3 | Successful suggestion in the description field with the disclaimer | requires a provider key with remaining quota | Not captured (quota exhausted) |
+| 4 | Graceful fallback message (503) in the UI | leave the key empty or use an exhausted key, press the button | Not captured in the browser (the 503 itself was observed at API level) |
 | 5 | 429 after pressing the button twice within a minute | press twice | Not captured |
 | 6 | Browser devtools Network tab showing the request goes to our own backend only, with no provider key in the request | open devtools, press the button | Not captured |
 
@@ -664,6 +701,16 @@ observability for provider latency/error rate, consider caching identical
    could not be produced. Rather than claim it, the live check was run against
    the real server process, and the container step is recorded as pending.
 
+9. **A provider key I did not know existed.** The live 503 took 394 ms, which is
+   far too slow for the "missing key" path, and the server log said
+   `AiServiceError (quota)` rather than `missingKey`. The cause: this Windows
+   account has `OPENAI_API_KEY` set as a user environment variable, so the process
+   inherited a real key even though `backend/.env` contains none. The lesson is
+   twofold - "no key in the config file" is not the same as "no key visible to the
+   process", and latency was the clue that the branch I assumed was not the branch
+   that ran. The documentation was corrected to report the real provider 429
+   instead of a simulated missing key, and no further provider calls were made.
+
 What this practical changed in my understanding: the hard part of an AI feature
 is not the prompt, it is the boundary - what leaves the process, what is trusted
 when it comes back, what the user is told when it fails, and how much it can cost
@@ -683,7 +730,8 @@ npm run test:integration                            # refused by the DB safety g
 npm run frontend:lint                              # exit 0
 npm run frontend:build                             # exit 0, built in 511 ms
 
-# live check against the real server (no AI key configured)
+# live check against the real server (provider key inherited from the OS env;
+# the provider answered HTTP 429 quota, which produced the 503 fallback)
 # PORT=5099 node backend/server.js  +  a scripted client
 #   401 / 503 fallback / 429 + Retry-After / 401 on /tasks / 400 on empty title  -> exit 0
 

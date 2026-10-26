@@ -13,7 +13,7 @@ Remote tracking at start: `origin/feature/practical-10-events`, 0 ahead / 0 behi
 
 ## 1. Commits created (local only)
 
-All five commits are local. **Nothing was pushed, merged, rebased, amended or
+All six commits are local. **Nothing was pushed, merged, rebased, amended or
 force-pushed.**
 
 | # | Commit | Message | Files | Lines |
@@ -22,7 +22,14 @@ force-pushed.**
 | 2 | `afc1955` | `feat: add AI description suggestions to task form` | 2 | +124 |
 | 3 | `db7ef5d` | `test: cover AI generation and fallback behavior` | 1 | +774 |
 | 4 | `4ea62e1` | `docs: document Practical 13 AI integration` | 1 | +711 |
-| 5 | *(this commit)* | `docs: add Practical 13 commit audit report` | 1 | this file |
+| 5 | `9a25920` | `docs: add Practical 13 commit audit report` | 1 | +235 |
+| 6 | *(this commit)* | `docs: correct Practical 13 live-provider findings` | 2 | see below |
+
+Commit 6 corrects commits 4 and 5 after the live-run logs were re-read: the
+provider had actually been reached and answered HTTP 429 (quota), which the
+earlier text wrongly described as "no provider key configured". The correction is
+recorded as its own commit instead of amending history, so the audit trail shows
+both the mistake and the fix. See section 6.
 
 ### Commit 1 - `ac64602` backend
 
@@ -54,11 +61,20 @@ force-pushed.**
 | --- | --- |
 | `docs/practical-13-ai-integration.md` | +711 (new) |
 
-### Commit 5 - this audit
+### Commit 5 - audit report
 
 | File | Change |
 | --- | --- |
-| `docs/practical-13-commit-audit.md` | new |
+| `docs/practical-13-commit-audit.md` | +235 (new) |
+
+### Commit 6 - correction
+
+| File | Change |
+| --- | --- |
+| `docs/practical-13-ai-integration.md` | corrected live-verification, precedence, limitations, screenshots, reflection |
+| `docs/practical-13-commit-audit.md` | corrected live-provider findings and secret/key notes |
+
+Commit 6 changes documentation only - no code, test or configuration file moved.
 
 No commit deletes or renames a file. No existing test was modified, skipped or
 weakened. `backend/package.json` was **not** committed even though it already
@@ -130,13 +146,35 @@ Verification after each commit:
 | Whole backend suite | `npm test` | **163 / 163 pass**, 0 fail, exit 0, 2.56 s |
 | Frontend lint | `npm run frontend:lint` | exit 0, no warnings |
 | Frontend build | `npm run frontend:build` | exit 0, built in 511 ms (`index-B9kC4DV5.js`) |
-| Live API check (real server, no AI key) | `PORT=5099 node backend/server.js` + scripted client | 401 / 503 fallback / 429 + `Retry-After` / 401 on `/tasks` / 400 on empty title - 6/6 assertions `PASS`, exit 0 |
+| Live API check (real server; real provider round-trip) | `PORT=5099 node backend/server.js` + scripted client | 401 / **503 fallback caused by a real provider HTTP 429 (quota)** / 429 + `Retry-After` / 401 on `/tasks` / 400 on empty title - 6/6 assertions `PASS`, exit 0 |
 | DB integration suite | `npm run test:integration` | **refused** by the safety guard (`TestDatabaseNotApprovedError`, `RUN_INTEGRATION_TESTS=1` not set), 20 tests refused, exit 1 |
 | Staged whitespace / conflict check | `git diff --cached --check` | exit 0 for every commit |
 | Staged secret scan | regex over `git diff --cached` | clean for every commit |
 
 Baseline before any edit, recorded for comparison: `npm test` 138/138 exit 0,
 lint exit 0, build exit 0. The 25 new tests account for 163 - 138.
+
+### What the live run actually did
+
+`backend/.env` has no provider key, but this Windows account has
+`OPENAI_API_KEY` set as a **user environment variable** (164 characters; the
+value was never printed, copied or committed). The server process inherited it,
+so the one authenticated request really did leave the machine and OpenAI replied
+**HTTP 429 (quota)** in 394 ms. The service logged
+`[ai] description generation failed: AiServiceError (quota)` and returned the 503
+fallback - a genuine provider-failure path, not a simulated one.
+
+Consequences, stated precisely:
+
+* **One** real provider request was made, by accident of environment inheritance.
+  No further provider calls were made after the logs were understood.
+* **No AI text was generated** and no successful generation is claimed.
+* A rejected request bills no tokens, so cost is effectively **zero**, but it is
+  not accurate to say "the provider was never called".
+* The key is **outside the repository** (OS environment), so nothing secret was
+  staged or committed; `.env` and the docs contain no key value.
+* Commits 4 and 5 were already written when this was discovered, so commit 6
+  corrects them rather than amending published history.
 
 ### Pre-existing flake, not caused by this practical
 
@@ -153,6 +191,8 @@ is disclosed here rather than hidden.
 | Rule | Status |
 | --- | --- |
 | No provider key in the repository | Confirmed - regex scan of every staged diff (`sk-…`, `AIza…`, `ghp_…`, private-key headers) found nothing |
+| Where the key actually lives | Not in `backend/.env` (it contains no AI variables). This machine has `OPENAI_API_KEY` as a Windows **user environment variable**, outside the repository. It was never printed, staged, copied into a file or logged |
+| Environment precedence | Shell/OS variables win over `backend/.env` (the loader does not override existing values). Documented in the integration doc so the "missing key" demo is not mistaken for a broken feature |
 | `.env` not committed | Confirmed - `backend/.env` is git-ignored; only `backend/.env.example` is tracked, with **empty** values |
 | No key in a `VITE_*` variable | Confirmed - `frontend/src` contains no provider key reference (enforced by a test) |
 | No key in URL / logs / responses | Confirmed - key is sent in a header; the controller logs only error name/code; the live check asserted no JWT secret appears in any body |
@@ -185,9 +225,10 @@ is disclosed here rather than hidden.
 | Item | Reality |
 | --- | --- |
 | Automated tests | **100% mocked.** No key read, no socket opened, no cost incurred, so CI needs no secret |
-| Live server check | **Real HTTP**, real routing, real auth, real limiter - but the provider was **never called** because no key is configured; the endpoint returned its 503 fallback |
-| Real provider request | **Not performed.** No key exists in this workspace; no AI output is claimed or shown |
-| Cost incurred | **Zero** |
+| Live server check | **Real HTTP** through the real router, auth and limiter; the provider was reached once and answered **429 (quota)**, translated to the 503 fallback |
+| Real provider request | **One, unintentionally**, because an OS-level `OPENAI_API_KEY` was inherited by the process. It was rejected before any generation |
+| Successful AI output | **None observed.** No suggestion text exists to show |
+| Cost incurred | Effectively **zero** (a rejected request bills no tokens), but the call was real |
 
 ---
 
@@ -196,7 +237,7 @@ is disclosed here rather than hidden.
 | Item | Reason | What is needed |
 | --- | --- | --- |
 | Docker container verification of the endpoint | Docker daemon unreachable at verification time | Start Docker Desktop, `docker compose up --build`, then repeat the five requests from the live check against port 5000 |
-| Screenshot of a successful AI suggestion | No provider key configured | Add a key to `backend/.env`, press **Generate description**, capture the form with the disclaimer |
+| Screenshot of a successful AI suggestion | The inherited provider key is quota-exhausted (HTTP 429) | Use a key with remaining quota, press **Generate description**, capture the form with the disclaimer |
 | Remaining screenshot placeholders | No browser capture was made in this environment | See section 15 of `docs/practical-13-ai-integration.md` |
 | Database integration suite | Refused by its own safety guard | An explicitly approved isolated test database plus `RUN_INTEGRATION_TESTS=1` |
 | Pre-existing flaky job test | Untracked work outside this practical's scope | Its owner should fix `jobService.test.js:223` |
@@ -209,7 +250,7 @@ degraded-path verification and the documentation are complete.
 ## 8. Push status
 
 Local branch `feature/practical-10-events` is **ahead of
-`origin/feature/practical-10-events` by 5 commits and was not pushed**.
+`origin/feature/practical-10-events` by 6 commits and was not pushed**.
 
 The prompt for this practical explicitly forbids pushing, merging, rebasing,
 amending and force-pushing, so the commits were left local. Pushing would be a
@@ -219,7 +260,8 @@ separate, explicitly authorised action.
 
 ## 9. Final state checklist
 
-* [x] 5 commits created, all with descriptive messages matching the suggested set
+* [x] 6 commits created, all with descriptive messages; the documentation
+      correction is a separate commit, not an amend
 * [x] No push, merge, rebase, amend, force-push
 * [x] No `reset --hard`, `clean`, `stash`, `restore`, `checkout`, `switch`
 * [x] No `git add .` / `git add -A`; every path listed explicitly
@@ -228,8 +270,9 @@ separate, explicitly authorised action.
 * [x] `backend/package.json` left unstaged and uncommitted
 * [x] No `.env`, credential, `node_modules`, `dist` or test artifact committed
 * [x] 25/25 new tests pass; full suite 163/163 on passing runs; lint and build pass
-* [x] Live degraded-path verification passed against the real server
+* [x] Live degraded-path verification passed against the real server, including a
+      real provider 429 translated to the fallback
 * [x] Documentation contains no fabricated screenshot, test result or live AI success
 * [x] Docker/DB safety guard respected; volume untouched
 * [ ] Docker container verification (pending - daemon unavailable)
-* [ ] Screenshot of a real AI suggestion (pending - no provider key)
+* [ ] Screenshot of a real AI suggestion (pending - provider key quota-exhausted)
