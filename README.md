@@ -292,4 +292,109 @@ The database must belong to you (or a disposable local instance, e.g.
 `mongod` locally or a separate Atlas cluster); using a production or shared
 dev database is refused by the guard.
 
+## Deployment (free hosting: Vercel + Render + MongoDB Atlas)
+
+Topology in production — identical to local, only the hosts change:
+
+```
+Browser  ->  https://<frontend>.vercel.app            (static Vite build)
+         ->  https://<backend>.onrender.com           (Express API + in-process email worker)
+Backend  ->  mongodb+srv://... (MongoDB Atlas M0 free tier)
+```
+
+The backend binds `process.env.PORT` on all interfaces (`app.listen(port)`
+with no host argument), which is exactly what Render requires. `GET /health`
+answers `200 {"status":"ok"}` with no auth, no DB dependency and no secrets —
+use it as the Render health-check path.
+
+### 1. MongoDB Atlas (database)
+
+1. Create a free **M0** cluster at cloud.mongodb.com.
+2. Create a database user (username + password, e.g. readWrite on any DB).
+3. Network Access: allow the Render egress (its free instances use dynamic
+   IPs, so `0.0.0.0/0` is the practical choice; Atlas will warn — accept it).
+4. Copy the SRV connection string (`mongodb+srv://<user>:<pass>@.../task_manager?authSource=admin`)
+   — this exact value becomes `MONGO_URI` on Render. Never commit it.
+
+### 2. Backend on Render (web service)
+
+Dashboard settings:
+
+| Setting | Value |
+|---|---|
+| Root Directory | `backend` |
+| Build Command | `npm install` |
+| Start Command | `npm start`  (= `node server.js`) |
+| Node version | 20 or newer (22/24 LTS recommended; verified locally on Node 24) |
+| Health Check Path | `/health` |
+
+Environment variables (Render → Environment, add all; **set values there, never
+in git**):
+
+| Variable | Required | Value / notes |
+|---|---|---|
+| `NODE_ENV` | yes | `production` |
+| `MONGO_URI` | yes | the Atlas SRV string from step 1 |
+| `JWT_SECRET` | yes | strong random, e.g. `openssl rand -hex 32` (PowerShell: `[guid]::NewGuid().ToString('N')+[guid]::NewGuid().ToString('N')`) |
+| `JOB_PAYLOAD_ENCRYPTION_KEY` | yes | **exactly 64 hex chars** — the server refuses to start without it. Generate: `openssl rand -hex 32` |
+| `FRONTEND_URL` | yes | `https://<frontend>.vercel.app` (used to build password-reset links in emails) |
+| `EMAIL_HOST` | for password-reset emails | `smtp.gmail.com` (or your SMTP host) |
+| `EMAIL_PORT` | for password-reset emails | `587` |
+| `EMAIL_USER` | for password-reset emails | SMTP account |
+| `EMAIL_PASSWORD` | for password-reset emails | SMTP app password |
+| `AI_PROVIDER` | no | `groq` (default behaviour) |
+| `GROQ_API_KEY` | no | Groq key; without it the AI feature degrades to the documented 503 fallback |
+| `GROQ_MODEL` | no | `qwen/qwen3.8-27b` (availability varies per key) |
+| `CORS_ORIGIN` | no | `https://<frontend>.vercel.app` — recommended hardening; unset keeps the historical `*` |
+| `PORT` | no | Render injects it automatically; the server reads it |
+
+Commands (equivalent to the dashboard settings, run inside `backend/`):
+
+```bash
+npm install      # build
+npm start        # start (node server.js)
+```
+
+### 3. Frontend on Vercel
+
+Dashboard settings:
+
+| Setting | Value |
+|---|---|
+| Root Directory | `frontend` |
+| Framework Preset | Vite (auto-detected) |
+| Build Command | `npm run build` (= `vite build`) |
+| Output Directory | `dist` (auto-detected) |
+
+Environment variables (Vercel → Settings → Environment Variables, **build
+time** — Vite inlines every `VITE_*` value into the public bundle):
+
+| Variable | Required | Notes |
+|---|---|---|
+| `VITE_API_URL` | yes | `https://<backend>.onrender.com` (no trailing slash) |
+| `VITE_GITHUB_USERNAME` | no | portfolio pages work without it |
+| `VITE_GITHUB_TOKEN` | no | **ends up in the public bundle by design of `VITE_*`** — if used, make it a fine-grained token with read-only access to public data only, or leave it unset (unauthenticated GitHub API: 60 req/h per IP) |
+
+Commands (equivalent to the dashboard settings, run inside `frontend/`):
+
+```bash
+npm install      # install
+npm run build    # vite build -> dist/
+```
+
+`frontend/vercel.json` provides the SPA rewrite to `index.html`, so deep links
+such as `/reset-password/:token` (the link inside reset e-mails) resolve
+instead of returning 404.
+
+### 4. Free-tier caveats
+
+* Render free web services **spin down after inactivity** — the first request
+  after idle takes ~30–60 s; subsequent ones are fast. The Atlas connection is
+  re-established on wake; the email worker starts after the DB connects.
+* One instance only: the in-process cache, rate limiters and the email worker
+  are per-process, which is consistent with a single instance.
+* After the first successful deploys, set `FRONTEND_URL` and (optionally)
+  `CORS_ORIGIN` on Render to the final Vercel domain, and redeploy the
+  frontend if `VITE_API_URL` changed (VITE values are baked at build time).
+
 

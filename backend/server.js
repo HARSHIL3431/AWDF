@@ -31,9 +31,24 @@ registerTaskListeners();
 // 1. Global logging middleware (logs method, url, timestamp)
 app.use(logger);
 
-// CORS middleware to support frontend integration
+// CORS middleware to support frontend integration.
+// Default remains '*' (unchanged local/dev behaviour). For production set
+// CORS_ORIGIN to the exact frontend origin(s), comma-separated, e.g.
+// CORS_ORIGIN=https://my-app.vercel.app — a matching browser Origin header is
+// then echoed back and any other origin receives no CORS allowance.
+const configuredOrigins = (process.env.CORS_ORIGIN || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const requestOrigin = req.headers.origin;
+  const allowOrigin = configuredOrigins.length === 0
+    ? '*'
+    : (requestOrigin && configuredOrigins.includes(requestOrigin))
+      ? requestOrigin
+      : configuredOrigins[0];
+  res.setHeader('Access-Control-Allow-Origin', allowOrigin);
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') {
@@ -65,6 +80,16 @@ app.get('/debug/cache-stats', authenticateToken, (req, res) => {
 // Authenticated aggregate job statistics (no payloads/emails/tokens)
 app.get('/debug/jobs', authenticateToken, createJobStatsHandler({ statsProvider: jobService }));
 
+
+// Deployment health check (additive, unauthenticated, deliberately boring):
+// hosting platforms (Render) probe a GET endpoint that must answer 200. It
+// exposes no configuration, no secrets and no database state — the DB
+// connection is reported separately in the startup log, so this endpoint
+// cannot be tricked into leaking anything and never fails the probe on a
+// transient MongoDB hiccup.
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
 
 // 5. Custom 404 route handler for undefined routes
 app.use((req, res, next) => {
