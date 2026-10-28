@@ -1,0 +1,870 @@
+# Practical 13 - Secure AI Task Description Generator
+
+Implementation of an AI feature inside the existing Task Management application:
+an authenticated user types a task title, presses **Generate description**, and
+the backend asks an LLM for a short description that is placed in the editable
+description field. Nothing is saved until the user presses **Add Task**.
+
+Everything below was produced in this repository. Where a result was not
+observed it is marked as pending instead of being claimed.
+
+---
+
+## 1. Objective and theory
+
+The practical asks for an AI feature that is genuinely useful but does not hand
+the provider key, the user's data or the application's reliability to a third
+party. The three requirements that drive the whole design are:
+
+1. **The key never reaches the browser.** Vite inlines every `VITE_*` variable
+   into the JavaScript bundle that any visitor can download. A provider key in a
+   `VITE_*` variable is therefore a published key. The key is read only from the
+   backend process environment.
+2. **The provider is optional at runtime.** If the key is missing, the quota is
+   exhausted, the network is down or the model returns nonsense, task management
+   must keep working exactly as before. The AI feature degrades; the app does not.
+3. **AI output is a suggestion, not an action.** The text is shown in an editable
+   field with a visible disclaimer and is never submitted automatically.
+
+The AI call is made server-side, from our own Express process, so that the key
+exists in exactly one place and every failure can be translated into a stable,
+client-safe response.
+
+---
+
+## 2. Architecture
+
+```
+Browser (React)
+   |  POST /api/ai/generate-description   { title }        Authorization: Bearer <app JWT>
+   v
+Express (our backend)  ----------------------------------------------  backend/server.js
+   |  app.use('/api/ai', aiRoutes)
+   v
+routes/aiRoutes.js
+   |  1. authenticateToken      (same policy as task creation -> 401)
+   |  2. aiRateLimiter          (per-task 1/min, per-user 10/min -> 429)
+   |  3. controller.generate    (validation -> 400)
+   v
+controllers/aiController.js
+   |  calls the service, maps every outcome to one stable JSON shape
+   v
+services/aiDescriptionService.js
+   |  provider = AI_PROVIDER (groq | openai | gemini)
+   |  key      = GROQ_API_KEY | OPENAI_API_KEY | GEMINI_API_KEY   (backend env only)
+   |  request  = title only, key in a HEADER, AbortController timeout
+   v
+https://api.groq.com/openai/v1/chat/completions      (Groq, OpenAI-compatible)
+https://api.openai.com/v1/chat/completions            (OpenAI)
+https://generativelanguage.googleapis.com/...         (Gemini)
+```
+
+Files added by this practical:
+
+| File | Responsibility |
+| --- | --- |
+| `backend/src/services/aiDescriptionService.js` | Provider calls, timeout, fixed error messages, output sanitising |
+| `backend/src/middleware/aiRateLimiter.js` | Process-local per-task and per-account limits, injectable clock, bounded map |
+| `backend/src/controllers/aiController.js` | Validation and the 200 / 400 / 503 response contract |
+| `backend/src/routes/aiRoutes.js` | Auth -> limiter -> handler wiring, mountable factory for tests |
+| `backend/test/aiGeneration.test.js` | 26 mocked tests (no key, no network, no cost) |
+| `frontend/src/services/aiService.js` | Browser -> our backend only |
+| `frontend/src/pages/Tasks.jsx` | Button, loading state, disclaimer (additive change) |
+| `backend/server.js` | One import and one `app.use('/api/ai', ...)` mount |
+| `backend/.env.example` | Empty placeholders for the provider settings |
+
+The application has **no global `/api` prefix** (auth is mounted at `/`, tasks at
+`/tasks`), so the router is mounted at `/api/ai` to make the documented path
+resolve to exactly `/api/ai/generate-description` without touching an existing
+route.
+
+Layer order is deliberate: authentication runs **before** the limiter, so an
+unauthenticated caller can never consume another user's quota.
+
+---
+
+## 3. Endpoint contract
+
+`POST /api/ai/generate-description`
+
+Request (authenticated, `Content-Type: application/json`):
+
+```json
+{ "title": "Prepare database backup" }
+```
+
+| Situation | Status | Body |
+| --- | --- | --- |
+| AI text produced | `200` | `{ "description": "...", "fallback": false, "message": "AI suggestion generated. Review it before using." }` |
+| Provider-side failure (missing/invalid key, timeout, quota, network, malformed output, unexpected exception) | `503` | `{ "description": "", "fallback": true, "message": "AI suggestions are temporarily unavailable. You can enter the description manually." }` |
+| Title missing / not a string / longer than 200 characters | `400` | `{ "error": "Title is required" }` |
+| No or invalid application token | `401` | `{ "error": "Access token required" }` |
+| Same title requested again within 60 s, or more than 10 AI requests per minute | `429` | `{ "error": "..." }` + `Retry-After: <seconds>` |
+
+Notes on the contract:
+
+* The body shape is **uniform** in both the success and the degraded case, so
+  the frontend has one branch to render and never has to parse a provider error.
+* `fallback: true` is the machine-readable signal that no AI text is present.
+* Nothing from the provider is echoed: no provider message, no status detail, no
+  error code, no stack trace, no headers.
+
+### Why 503 and not 200
+
+Returning `200` for "the provider failed" would make a broken integration
+invisible in logs, dashboards and uptime checks, and would force every client to
+inspect a flag to know whether the call worked. `503 Service Unavailable` is the
+honest status for "a dependency this feature needs is unavailable"; the body
+still carries the predictable fallback payload the UI needs. `500` is reserved
+for genuinely unexpected application bugs by the existing centralised error
+handler.
+
+---
+
+## 4. Provider configuration
+
+All three providers are supported with **no new npm dependency**: Node 24 ships a
+global `fetch` and `AbortController`.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `AI_PROVIDER` | `groq` | `groq`, `openai` or `gemini`; anything else is treated as unsupported and degrades |
+| `GROQ_API_KEY` | *(empty)* | Groq key - backend only |
+| `OPENAI_API_KEY` | *(empty)* | OpenAI key - backend only |
+| `GEMINI_API_KEY` | *(empty)* | Gemini key - backend only |
+| `GROQ_MODEL` | `qwen/qwen3.8-27b` | Optional model override (availability varies per key/plan) |
+| `OPENAI_MODEL` | `gpt-4o-mini` | Optional model override |
+| `GEMINI_MODEL` | `gemini-2.0-flash` | Optional model override |
+
+`.env.example` (tracked) documents the names with **empty values**; the real
+`backend/.env` is git-ignored and is supplied to the container at runtime by
+`docker-compose.yml` via `env_file: ./backend/.env` (no build argument, so the
+key is not baked into an image layer).
+
+Provider selection is a single lookup table (`PROVIDERS`), so the three
+implementations stay symmetric. OpenAI and Groq share one factory because Groq
+is explicitly OpenAI-compatible (same wire format, same response shape); only
+the endpoint, key variable and default model differ:
+
+| | Groq | OpenAI | Gemini |
+| --- | --- | --- | --- |
+| Endpoint | `POST /openai/v1/chat/completions` | `POST /v1/chat/completions` | `POST /v1beta/models/{model}:generateContent` |
+| Key transport | `Authorization: Bearer <key>` header | `Authorization: Bearer <key>` header | `x-goog-api-key: <key>` header |
+| Default model | `qwen/qwen3.8-27b` | `gpt-4o-mini` | `gemini-2.0-flash` |
+| Timeout | `AbortController`, 8 s | same | same |
+| Unsupported provider | `AiServiceError('unsupportedProvider')` -> 503 | same | same |
+
+Note on Groq models: **model availability varies per key and plan** (some keys
+cannot see `llama-3.3-70b-versatile`, which is how the default below was chosen
+- see section 11b), so `GROQ_MODEL` exists as an override and an unavailable
+model degrades to the 503 fallback through the normal provider-error path - it
+never crashes the endpoint. `openai/gpt-oss-20b` is a reasoning model that can
+answer with an empty `content` field; the malformed-output guard treats that as
+a failure rather than returning junk.
+
+The key is **never** placed in a URL query string, because URLs are logged by
+proxies, browsers, shell history and crash reports.
+
+---
+
+## 5. Prompt design and data minimisation
+
+The system prompt describes the output contract only - two or three sentences,
+at most 60 words, actionable, no invented people/dates/budgets/tools, no markdown
+or preamble. The user turn is a single line:
+
+```
+Task title: <the title the user just typed>
+```
+
+That is the **only** application data that leaves the process. Not sent: the
+user record, e-mail address, id, JWT, other tasks, project names, cache contents,
+environment variables. This is checked by the test suite (the mocked `fetch`
+asserts on the exact request body).
+
+Output handling:
+
+* whitespace is collapsed,
+* wrapping quotes the model likes to add are stripped,
+* the result is capped at 600 characters (a provider can never flood the input),
+* an empty or non-string answer is treated as a failure, not as a success.
+
+---
+
+## 6. Failure handling
+
+Every expected failure is converted inside the service into an `AiServiceError`
+carrying a **fixed, client-safe message** (the provider's own wording is never
+retained), then mapped by the controller to the single 503 fallback body.
+
+| Condition | Detected by | Client sees |
+| --- | --- | --- |
+| Key not configured | empty/missing env var, checked **before** any network call | 503 fallback |
+| Key rejected | provider status 401 / 403 | 503 fallback |
+| Quota / rate limited by provider | provider status 429 | 503 fallback |
+| Provider error | any other provider status >= 400 | 503 fallback |
+| Timeout | `AbortError` / `TimeoutError` from the 8 s AbortController | 503 fallback |
+| Network unreachable / DNS / TLS | `fetch` rejection | 503 fallback |
+| Malformed or empty answer | JSON parse failure, unexpected shape, empty text | 503 fallback |
+| Unsupported `AI_PROVIDER` value | lookup failure | 503 fallback |
+| Anything unforeseen thrown by the service | controller `catch` | 503 fallback |
+| Broken response body access | outer `catch` -> `next(error)` | existing centralised error handler |
+
+The quota row is the one observed live (see section 11); every other row is
+covered by the mocked tests.
+
+Logging is intentionally minimal: only the error **name** and **code** are
+logged (`[ai] description generation failed: AiServiceError (timeout)`), never
+the provider message, never request headers, never the key.
+
+The frontend treats the 503 the same way it treats a 429: it shows a short
+message and leaves the description field editable. **Task creation is never
+blocked by an AI failure** - this is asserted by a test.
+
+---
+
+## 7. Rate limiting
+
+`POST /api/ai/generate-description` costs money per call and the key is shared by
+the whole deployment, so an authenticated user must not be able to loop it.
+
+| Limit | Value | Why |
+| --- | --- | --- |
+| Per task key | 1 request / 60 s | The practical's supplementary requirement: one generation per task per minute |
+| Per account | 10 requests / 60 s | A cost ceiling, so a caller cannot spend quota by submitting endless distinct titles |
+
+Design details:
+
+* **Keying without inventing a schema field.** The form creates tasks that have
+  no persistent id yet, so the key is derived from the request:
+  `task key = sha256(principal + NUL + normalised title)` and
+  `user key = sha256(principal)`. Both are hashed: neither the title nor the user
+  id is kept in memory. The title is normalised and capped at 200 characters
+  before hashing, so a long title cannot build an oversized key.
+* **Injectable clock.** `createAiRateLimiter({ now })` accepts a clock, so tests
+  advance virtual time instead of waiting 60 real seconds. The full suite runs in
+  about 2.6 s.
+* **Bounded memory.** The bucket map has `maxSize` (default 5000) and evicts
+  empty-then-oldest buckets, so it cannot grow without limit. A test pushes 500
+  distinct keys through and asserts the map stays capped instead of taking the
+  bound on trust (a `stats()` diagnostics hook exposes the size).
+* **Fail-open.** If the limiter itself throws, it logs the error name and calls
+  `next()`. A limiter bug must not take down the endpoint; the provider timeouts
+  and auth still bound the damage.
+* **429 is explicit.** The response carries `Retry-After` in seconds and a
+  human-readable message, and the frontend shows it.
+* **Invalid input does not consume quota.** A request with no usable title is
+  passed straight to the controller, which returns 400.
+
+### Why a separate limiter module
+
+An in-progress, uncommitted `src/middleware/rateLimiter.js` exists in the working
+tree (forgot-password, keyed by client IP) but it is **untracked and imports
+another untracked module**, so importing it would break a fresh clone and CI. It
+is also IP-keyed, which is the wrong axis here (the cost unit is the task, and
+the caller is authenticated). The AI limiter is therefore a small self-contained
+module used by this endpoint only; no existing limiter was modified or
+duplicated in behaviour.
+
+### Honest scope
+
+Counters live in the process memory. They reset on restart and are **not shared
+between replicas**, so with N instances the effective limit is N times the
+configured value. This is per-instance cost protection, not distributed rate
+limiting; a shared store (Redis) would be required for that.
+
+---
+
+## 8. Frontend integration
+
+`frontend/src/services/aiService.js` mirrors the conventions of the existing
+`taskService`:
+
+* the same `VITE_API_URL` base (fallback `http://localhost:5000`),
+* the same `Authorization: Bearer <token>` header helper,
+* the same 401 handling (`removeToken()` + `auth-unauthorized` event), so an
+  expired session behaves identically everywhere,
+* the browser calls **only** our own backend - the provider host appears nowhere
+  in `frontend/src` (enforced by a test).
+
+`frontend/src/pages/Tasks.jsx` gains:
+
+* a real `<button type="button">` ("Generate description") inside the existing
+  form actions row,
+* a `generating` state that disables the button and shows "Generating..." with
+  `aria-busy` and a `role="status"` live region - duplicate requests cannot be
+  fired by double-clicking,
+* the suggestion written into the **existing** description field (still editable,
+  still dismissible by clearing it),
+* a visible disclaimer while the current text came from the provider:
+  *"AI-generated suggestion - review and edit before using."* (`role="note"`),
+* a friendly message on 429 / 503 that leaves the form fully usable.
+
+Nothing is saved automatically: the text reaches the database only through the
+normal **Add Task** submission, and the disclaimer state is cleared when the form
+is reset, when a new title is entered, or when a task is submitted.
+
+No CSS file was changed: the button reuses the existing `action-row`,
+`form-button--ghost` and `muted` classes.
+
+---
+
+## 9. Local setup without a real key
+
+The feature is designed to be demonstrable with **no** provider account:
+
+```bash
+# 1. dependencies (already used by the project)
+npm install --prefix backend
+npm install --prefix frontend
+
+# 2. configure: copy the example and leave the key empty
+cp backend/.env.example backend/.env      # Windows: copy backend\.env.example backend\.env
+#    AI_PROVIDER=groq
+#    GROQ_API_KEY=           <- empty on purpose
+
+# 3. run
+npm run dev            # or: docker compose up --build
+```
+
+With an empty key the endpoint returns the 503 fallback and the UI shows
+"AI suggestions are temporarily unavailable...". That is the **expected,
+correct** behaviour and the easiest way to demonstrate graceful degradation.
+
+To enable real suggestions, put a key in `backend/.env` **only** (never in
+`frontend/.env`, never in a `VITE_*` variable, never in a commit). This repo is
+configured for Groq by default:
+
+```
+AI_PROVIDER=groq
+GROQ_API_KEY=<your Groq key>
+GROQ_MODEL=qwen/qwen3.8-27b     # optional; availability varies per key/plan
+```
+
+For the other providers the equivalent is `AI_PROVIDER=openai` +
+`OPENAI_API_KEY=...`, or `AI_PROVIDER=gemini` + `GEMINI_API_KEY=...`.
+
+Choosing a Groq model: not every key can see every model. List what your key
+may use (the response contains model ids only, no secret):
+
+```bash
+curl -s -H "Authorization: Bearer $GROQ_API_KEY" \
+  https://api.groq.com/openai/v1/models | grep '"id"'
+```
+
+Pick a chat model from that list (for example `qwen/qwen3.8-27b` or
+`openai/gpt-oss-120b`) and set it as `GROQ_MODEL`. A model your key cannot use
+answers HTTP 404 `model_not_found`, which the service reports as the 503
+fallback - a safe failure, but obviously no suggestion.
+
+The key is read at request time from `process.env`, so a restart of the backend
+is enough; no rebuild is required and no key is baked into the image.
+
+Beware of precedence: the loader does not overwrite a variable that is already
+present in the process environment, so a `GROQ_API_KEY` exported in the shell
+(or stored as an OS user variable) silently wins over `backend/.env`. That is
+convenient for a real key and surprising when demonstrating the missing-key path
+- clear it for that process (section 12) if you want the "not configured" case.
+
+---
+
+## 10. Tests
+
+Command (from the repository root):
+
+```bash
+node --test "backend/test/aiGeneration.test.js"     # this practical only
+npm test                                           # whole backend suite
+```
+
+Result of the Practical 13 file, measured in this workspace (after the Groq
+provider was added):
+
+```
+ℹ tests 26
+ℹ pass 26
+ℹ fail 0
+ℹ duration_ms 1113.88
+exit 0
+```
+
+Whole suite, measured in this workspace:
+
+```
+ℹ tests 164
+ℹ pass 164
+ℹ fail 0
+ℹ duration_ms 2198.45
+exit 0
+```
+
+(164 = the 138 tests that existed before this practical + the 26 in
+`aiGeneration.test.js`.)
+
+Every provider call is mocked. The suite reads no key, opens no socket and
+cannot incur charges, so it runs in CI with no secret configured. The one
+credential-shaped string in the fixtures (`sk-test-not-a-real-key-...`) is a
+literal placeholder used to prove the key travels in a header; it is not a real
+credential.
+
+### What the 26 cases cover
+
+| # | Area | Cases |
+| --- | --- | --- |
+| 1 | Success, Groq | returns sanitised text; key in `Authorization` header; absent from URL and body; only the title leaves the process |
+| 2 | Success, OpenAI | same contract on the OpenAI endpoint (shared OpenAI-compatible factory) |
+| 3 | Success, Gemini | `x-goog-api-key` header; model path; parsed text |
+| 4 | Missing key | fails closed **before** any network call -> 503 fallback (all three providers, empty and whitespace keys) |
+| 5 | Unsupported provider | -> 503 fallback |
+| 6 | Timeout | aborted request -> 503 fallback (virtual clock, no waiting) |
+| 7 | Network failure | `fetch` rejection -> 503 fallback |
+| 8 | Quota | provider 429 -> 503 fallback |
+| 9 | Rejected key | provider 401 / 403 -> 503 fallback |
+| 10 | Provider errors | provider 400 / 5xx -> 503 fallback (an unavailable Groq model lands here as 404 `model_not_found`) |
+| 11 | Malformed output | invalid JSON, empty text (e.g. reasoning models such as `openai/gpt-oss-20b` that answer with an empty `content`), non-string shape -> 503 fallback |
+| 12 | Input validation | missing / non-string / over-long title -> 400; over-long answer capped |
+| 13 | Response contract | 200 body shape, 503 body shape, unexpected exception degraded (no stack, no provider text) |
+| 14 | Rate limit | 1/min per task; 429 + `Retry-After`; scoped by title and by user; window re-opens; invalid titles consume nothing; per-account ceiling; bound under 500-key churn |
+| 15 | Routing over real HTTP | `/api/ai/generate-description` resolves; 401 without a valid token; 404 for other paths in the mount; authenticated run hits 429 then recovers |
+| 16 | No regression | task creation and listing still work while the provider is unavailable |
+| 17 | Frontend privacy guard | no provider endpoint (Groq, OpenAI, Gemini) and no provider key variable anywhere in `frontend/src` |
+
+The project has no frontend test runner (verified: `frontend/package.json` has
+lint and build only), so the "the browser must never call the provider" rule is
+enforced by a static guard test rather than added as an unverified claim or by
+installing a test framework this practical does not need.
+
+### Pre-existing flaky test (not caused by this practical)
+
+`backend/test/jobService.test.js:223` is an untracked test from earlier work and
+it is flaky (a `strictEqual` between two ids). During this practical the full
+suite passed 163/163 twice and failed once on exactly that assertion. It was
+**not** modified, skipped or weakened; touching it would be outside this
+practical's scope and would hide someone else's flake.
+
+### Integration suite
+
+`npm run test:integration` still refuses to run: `TestDatabaseNotApprovedError`
+(`RUN_INTEGRATION_TESTS=1` opt-in is not set), 20 tests refused. That guard is
+intentional and was not bypassed.
+
+---
+
+## 11. Live verification through the real server
+
+The automated tests mount the router themselves, so the `server.js` mount was
+also verified live, against the **real application** started on spare ports with
+the real `backend/.env`. No task was created, and no secret or token appears in
+the output below.
+
+### 11a. Successful generation with the real Groq provider
+
+With `AI_PROVIDER=groq` and a real `GROQ_API_KEY` in `backend/.env` (the model
+override `GROQ_MODEL=qwen/qwen3.8-27b` was required - see below), one
+authenticated request really did travel to Groq and came back with a generated
+description:
+
+```
+POST /api/ai/generate-description  (valid token, title "Prepare the quarterly budget spreadsheet")
+  status: 200  (933 ms round-trip)
+  body:   {"description":"Compile the quarterly budget spreadsheet to ensure accurate
+            financial tracking and resource allocation. This document is essential for
+            monitoring spending against targets and supporting informed strategic
+            decisions for the upcoming period.","fallback":false,
+            "message":"AI suggestion generated. Review it before using."}
+
+POST /api/ai/generate-description  (same title again, same user)
+  status: 429  Retry-After: 60     <- blocked by OUR limiter before any provider call
+```
+
+The check script printed `PASS` for all twelve assertions: 200 with
+`fallback:false`, a non-empty description within the 600-character cap, the
+review disclaimer present, a fast round-trip, the per-task 429 with
+`Retry-After`, and - critically - **no key material and no JWT secret in any
+response body or any server log line**, and no task content in the logs. Script
+exit code: `0`.
+
+A real provider call was made here **on purpose**: the user explicitly provided
+a Groq key for this feature. Exactly one generation request was sent; the
+follow-up 429 never leaves the process.
+
+### 11b. What the first attempt taught us (model availability)
+
+The first live attempt failed with the 503 fallback and the service log
+`[ai] description generation failed: AiServiceError (providerError)`. Probing
+the API directly showed the cause: HTTP 404 `model_not_found` - the model used
+in Groq's own docs, `llama-3.3-70b-versatile`, is **not visible to this key**,
+because Groq model availability varies per key and plan. Listing the key's models
+(`GET /openai/v1/models`) and choosing `qwen/qwen3.8-27b` from that list fixed
+it, and `qwen/qwen3.8-27b` was then made the code default for Groq. Two lessons
+are recorded here rather than hidden:
+
+* "It works with the default model on the provider's docs page" is not a
+  guarantee for a specific key; the override variable is not optional
+  decoration, it is the escape hatch for exactly this.
+* `openai/gpt-oss-20b` (also available to this key) answered HTTP 200 with an
+  **empty `content`** field - a reasoning model that emits its reasoning
+  elsewhere. The malformed-output guard treated it as a failure instead of
+  returning an empty suggestion, which is the intended behaviour.
+
+### 11c. Degraded-path checks on the real server
+
+The same script (with `OPENAI_API_KEY`/`GROQ_API_KEY` forced empty for the
+child process, so no provider call could occur) verified the failure contract
+on the production wiring - all thirteen assertions passed:
+
+```
+POST /api/ai/generate-description  (no token)
+  status: 401
+  body:   {"error":"Access token required"}
+
+POST /api/ai/generate-description  (malformed token)
+  status: 401
+  body:   {"error":"Invalid or expired token"}
+
+POST /api/ai/generate-description  (valid token, empty title)
+  status: 400
+  body:   {"error":"Title is required"}
+
+POST /api/ai/generate-description  (valid token; NO AI key configured)
+  status: 503
+  body:   {"description":"","fallback":true,"message":"AI suggestions are temporarily unavailable. You can enter the description manually."}
+
+POST /api/ai/generate-description  (same title again, same user)
+  status: 429  Retry-After: 60
+  body:   {"error":"An AI suggestion for this task was already generated. Try again in about a minute."}
+
+POST /api/ai/unknown  (valid token)
+  status: 404        <- only the documented path exists under /api/ai
+
+GET /tasks  (no token - existing endpoint unchanged)
+  status: 401
+  body:   {"error":"Access token required"}
+```
+
+This proves, end to end and with the production wiring: the documented path
+exists on the real server, authentication and the limiter run in the intended
+order, a successful generation works, a provider failure degrades gracefully
+instead of crashing, and existing endpoints are unaffected.
+
+### 11d. Historical note: the earlier OpenAI run
+
+An earlier live run (before the Groq key was configured) inherited an
+`OPENAI_API_KEY` from the Windows user environment and reached OpenAI, which
+answered HTTP 429 (quota); the service logged
+`[ai] description generation failed: AiServiceError (quota)` and produced the
+same 503 fallback. That was the first genuine provider-failure observation and
+is what section 17's reflection refers to.
+
+### Docker-container verification: pending
+
+`docker compose ps` could not run at verification time because the Docker daemon
+was unreachable on this machine
+(`npipe:////./pipe/dockerDesktopLinuxEngine: The system cannot find the file
+specified`). The stack itself was therefore **not** re-verified for this
+practical and is recorded as pending rather than claimed. No destructive Docker
+command was run and the MongoDB data volume was not touched.
+
+---
+
+## 12. Graceful-failure demonstration
+
+Because failure is the interesting part of an AI integration, the degraded path
+is demonstrable without any key:
+
+1. Keep `GROQ_API_KEY=` empty in `backend/.env` and start the app.
+2. Log in, type a title, press **Generate description**.
+3. Expected: the button shows "Generating..." briefly, then the form shows
+   *"AI suggestions are temporarily unavailable. You can enter the description
+   manually."*, the description field stays editable, and **Add Task still
+   works**.
+4. Press the button twice in a row: the second request returns 429 and the UI
+   reports that a suggestion was already generated, without breaking the form.
+5. Network-level failure looks the same: with the network disabled, the transport
+   error and the 8 s timeout both map to the same fallback.
+6. An exhausted-quota key also produces the same 503, because a provider `429`
+   maps to it - this is exactly what the earlier OpenAI live run hit (11d).
+7. A model the key cannot use also produces the same 503, because a provider
+   404 `model_not_found` maps to the provider-error path (11b).
+
+**Environment precedence (important when reproducing):** the loader does not
+overwrite variables that already exist in the process environment, so a key
+exported in the shell or stored as an OS user variable takes precedence over
+`backend/.env`. On such a machine, clear it for that one process to see the
+missing-key path:
+
+```powershell
+$env:GROQ_API_KEY = ''
+npm run dev
+```
+
+```bash
+GROQ_API_KEY= npm run dev
+```
+
+---
+
+## 13. Responsible AI and privacy
+
+| Concern | Measure in this implementation |
+| --- | --- |
+| Secret leakage | Key read from the backend environment only; never in a `VITE_*` variable, a URL, a log line or a response; `.env` is git-ignored, `.env.example` holds empty placeholders |
+| Data minimisation | Only the task title is sent; no identity, no token, no other task or project data |
+| Third-party retention | The provider's own data policy applies to the title; the prompt instructs the model to invent nothing, and the app stores only the text the user accepts |
+| Output trust | Output is a suggestion in an editable field with a visible disclaimer; it is never auto-saved, never auto-submitted, and never used to trigger an action |
+| Hallucination | Prompt constrained to 2-3 sentences with no invented people, dates, budgets or tools; length capped; the user must review |
+| Account abuse / cost | Authenticated endpoint, per-task 1/min, per-account 10/min, 8 s timeout, `max_tokens`/`maxOutputTokens` cap of 160 |
+| Error disclosure | Fixed messages only; provider text, status detail and stacks never reach the client; logs carry the error name/code only |
+| Availability | Missing key, provider outage or malformed answer degrade to 503 with a fallback body; task management is unaffected |
+| Fairness / bias | No user attribute is sent, so the model cannot condition the description on the user's identity |
+| Transparency | The UI labels the text as AI-generated; this document records exactly what is sent and what is not |
+| Compliance with the provider's terms | Content is user-authored task titles; the feature is disclosed in the UI and documented here |
+
+Residual privacy risk, stated plainly: the title is user content and it *does*
+leave our infrastructure to a third-party API. A deployment that cannot accept
+that (for example one handling regulated data) should leave the key unset - the
+feature then simply reports itself unavailable, which is a supported state.
+
+---
+
+## 14. Known limitations
+
+1. **Process-local rate limiting.** Counters are per Node process; a restart
+   resets them and multiple replicas get their own. Distributed limiting needs a
+   shared store.
+2. **Task identity is derived, not stored.** Because the form's task does not
+   exist yet, the limit is keyed by a hash of (user, normalised title). Two users
+   with the same title are independent; one user who edits a title by one
+   character gets a new key. That is the correct trade-off for a pre-creation
+   form, but it is not the same as a database-backed per-task counter.
+3. **No streaming.** The description arrives as one response; the UI shows a
+   single "Generating..." state.
+4. **No retry/backoff against the provider.** A failure is reported once; the
+   user can retry after the local window. Retrying internally would multiply
+   latency and cost.
+5. **Provider parity is by contract, not by benchmark.** All providers are
+   tested with the same mocked contract; output quality differences between
+   models were not evaluated.
+6. **Groq model availability is per key.** The model from Groq's docs
+   (`llama-3.3-70b-versatile`) was invisible to the configured key (HTTP 404
+   `model_not_found`), so the Groq default is now `qwen/qwen3.8-27b` and
+   `GROQ_MODEL` can select any model the key can list. A wrong model degrades
+   to the 503 fallback rather than failing loudly at startup - safe, but the
+   misconfiguration is only visible in the backend log.
+7. **Docker container re-verification is pending** because the Docker daemon was
+   unavailable during this practical.
+8. **Frontend behaviour is not covered by an automated UI test** (the project has
+   no frontend test runner); the privacy rule is enforced statically and the
+   component was verified by lint, a production build and the API-level contract.
+9. **Rate limiting is not applied to any other endpoint**, by design: it is
+   isolated to the AI endpoint.
+
+---
+
+## 15. Screenshot / evidence placeholders
+
+The screenshots below have **not** been captured in this workspace (no browser
+session was driven here). They are listed so they can be added when a demo
+environment is available - no image is invented here. Note that since the Groq
+key works (section 11a), capturing #3 no longer needs special setup: just press
+the button.
+
+| # | What to capture | How to produce it | Status |
+| --- | --- | --- | --- |
+| 1 | New Task form with the **Generate description** button | `npm run dev`, log in, open the task form | Not captured |
+| 2 | Loading state: "Generating..." while the request is in flight | throttle the network in devtools, press the button | Not captured |
+| 3 | Successful suggestion in the description field with the disclaimer | configured Groq key (`GROQ_MODEL` set to a model the key can use), press the button | Not captured in the browser (a successful 200 generation was observed at API level, section 11a) |
+| 4 | Graceful fallback message (503) in the UI | leave the key empty, press the button | Not captured in the browser (the 503 itself was observed at API level) |
+| 5 | 429 after pressing the button twice within a minute | press twice | Not captured in the browser (the 429 was observed at API level) |
+| 6 | Browser devtools Network tab showing the request goes to our own backend only, with no provider key in the request | open devtools, press the button | Not captured (the equivalent rule is enforced by the static guard test over `frontend/src`) |
+
+Text evidence that *was* produced and can be pasted into the report: the test
+counts (section 10), the live API output (section 11) and the commit list
+(section 20 and `docs/practical-13-commit-audit.md`).
+
+---
+
+## 16. Viva-ready questions
+
+**1. Where is the API key stored and why not in the frontend?**
+In the backend environment (`backend/.env`, git-ignored) and read by
+`aiDescriptionService` at request time. Vite inlines `VITE_*` variables into the
+public bundle, so any such variable would publish the key; the browser therefore
+never sees it, and a test asserts no provider key variable exists in
+`frontend/src`.
+
+**2. How do you prove the key is not in the request URL?**
+The mocked `fetch` assertions check the URL, the headers and the serialised body:
+the key appears only in `Authorization` (Groq and OpenAI) or `x-goog-api-key`
+(Gemini), never in the URL or the body. URLs are logged by proxies and browsers,
+headers are not. The live check additionally asserts no key-shaped string
+appears in any response body or server log line.
+
+**3. What exactly is sent to the provider?**
+The normalised task title (max 200 characters) plus a fixed system prompt. No
+user record, token, e-mail, project, other task or configuration.
+
+**4. What happens when the provider fails?**
+Every provider-side outcome (missing key, 401/403, 429, other 4xx/5xx, timeout,
+network error, malformed or empty output, unsupported provider, unexpected
+exception) is mapped to `503` with `{ description: "", fallback: true, message }`.
+The user is told to write the description manually, and task creation is
+unaffected - there is a test for that.
+
+**5. Why not return 200 with an error field?**
+Because the call did not succeed. `503` keeps the failure visible to monitoring
+and is honest to clients, while the body stays predictable for the UI. `500` is
+kept for genuine application bugs.
+
+**6. How is the timeout implemented and verified?**
+`AbortController` + `setTimeout` (8 s), cleared in `finally`. The test injects a
+`fetch` that rejects with an `AbortError` (and a controllable timeout), so the
+timeout path is exercised in milliseconds, not by waiting 8 s.
+
+**7. How does the rate limit work without waiting a minute in tests?**
+`createAiRateLimiter({ now })` takes an injectable clock. Tests advance virtual
+time past the 60 s window, so the suite runs in ~2.6 s while the production
+window is real.
+
+**8. Why is the memory footprint bounded?**
+Its `Map` has `maxSize` (5000) and prunes empty buckets then evicts oldest keys.
+A test pushes 500 distinct keys and asserts the size stays capped.
+
+**9. Why not reuse the existing rate limiter?**
+It is untracked (would break a fresh clone/CI), it keys by IP (wrong axis for an
+authenticated, per-task cost), and it serves a different endpoint. Reusing it
+would couple this feature to unfinished work; instead a small isolated module is
+used for this endpoint only.
+
+**10. Is the AI output saved automatically?**
+No. It is written into the editable description field with the disclaimer
+"AI-generated suggestion - review and edit before using." and only reaches the
+database when the user submits the form.
+
+**11. How do you prevent a giant provider response from breaking the form?**
+The service collapses whitespace, strips wrapping quotes and caps the text at 600
+characters before it is returned; empty or non-string output is treated as a
+failure.
+
+**12. What would you change for production at scale?**
+Move the counters to a shared store (Redis), add a per-user daily budget, add
+observability for provider latency/error rate, consider caching identical
+(user, title) results for a short TTL, and add a UI test for the button flow.
+
+---
+
+## 17. Reflection - errors encountered and how they were resolved
+
+1. **No global `/api` prefix.** The obvious `app.use('/api', aiRoutes)` would have
+   produced `/api/generate-description`, not the required path. Inspecting
+   `server.js` showed auth at `/` and tasks at `/tasks`; mounting the router at
+   `/api/ai` fixed the path without touching existing routes, and the route test
+   asserts the exact path.
+2. **Unusable existing limiter.** The first plan was to reuse
+   `src/middleware/rateLimiter.js`. It turned out to be untracked and to import
+   another untracked module, so committing a dependency on it would break a
+   fresh clone and CI. Worse, it keys by IP, not by task. The resolution was a
+   small self-contained limiter for this endpoint.
+3. **No task id to key the limit on.** The form's task does not exist yet; adding
+   a database field for a transient form value would be schema noise. Keying by
+   `sha256(user + title)` gives the required "once per minute per task" semantic
+   without inventing a field, and keeps the title out of memory as plaintext.
+4. **A commit message that contained double quotes** was split by the shell and
+   `git commit` failed with "did not match any file(s) known to git". Nothing was
+   committed and the index was intact; the fix was to pass the message with
+   `git commit -F <file>` so quoting can never interfere again.
+5. **Pre-existing work inside files that the practical must touch.**
+   `backend/server.js` and `backend/.env.example` already carried uncommitted
+   changes (job work and test/env additions). Committing the files wholesale
+   would have stolen that work into this practical's commit. They were staged
+   partially - only the AI lines were put in the index - and the unstaged diff was
+   re-checked afterwards to confirm the pre-existing changes were byte-for-byte
+   untouched.
+6. **A flaky test from earlier work** (`backend/test/jobService.test.js:223`)
+   failed once during full-suite runs. It is untracked and unrelated; it was left
+   alone and is documented rather than silenced.
+7. **Windows exit-code artifact in the live check.** The script reported the
+   correct assertions but crashed during process teardown in libuv
+   (`Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)`) because of lingering
+   keep-alive sockets. Sending `Connection: close` and using `process.exitCode`
+   instead of `process.exit()` produced a clean `exit 0`.
+8. **Docker daemon unavailable** at final verification, so container evidence
+   could not be produced. Rather than claim it, the live check was run against
+   the real server process, and the container step is recorded as pending.
+
+9. **A provider key I did not know existed.** The live 503 took 394 ms, which is
+   far too slow for the "missing key" path, and the server log said
+   `AiServiceError (quota)` rather than `missingKey`. The cause: this Windows
+   account has `OPENAI_API_KEY` set as a user environment variable, so the process
+   inherited a real key even though `backend/.env` contains none. The lesson is
+   twofold - "no key in the config file" is not the same as "no key visible to the
+   process", and latency was the clue that the branch I assumed was not the branch
+   that ran. The documentation was corrected to report the real provider 429
+   instead of a simulated missing key, and no further provider calls were made.
+
+10. **The documented default Groq model was invisible to the real key.** After
+    the Groq key was configured, the live check returned the 503 fallback and the
+    log said `AiServiceError (providerError)`. Probing the API directly revealed
+    HTTP 404 `model_not_found`: `llama-3.3-70b-versatile` (the model used in
+    Groq's own docs) is not available to this key. Listing the key's models and
+    picking `qwen/qwen3.8-27b` fixed it. The deeper lesson: provider docs show
+    *a* model, not *your* key's models, so `GROQ_MODEL` is a required escape
+    hatch, and a probe of `GET /openai/v1/models` is the fastest diagnosis.
+    A second finding from the same probe: `openai/gpt-oss-20b` answered 200 with
+    an **empty** `content` field (a reasoning model), which the malformed-output
+    guard correctly rejected instead of returning an empty suggestion.
+
+What this practical changed in my understanding: the hard part of an AI feature
+is not the prompt, it is the boundary - what leaves the process, what is trusted
+when it comes back, what the user is told when it fails, and how much it can cost
+before anyone notices.
+
+---
+
+## 18. Commands used for verification
+
+```bash
+# tests
+node --test "backend/test/aiGeneration.test.js"     # 26/26, exit 0
+npm test                                           # 164/164, exit 0
+npm run test:integration                            # refused by the DB safety guard (expected)
+
+# frontend
+npm run frontend:lint                              # exit 0
+npm run frontend:build                             # exit 0, built in 927 ms
+
+# live check against the real server with the REAL Groq key
+# (one deliberate generation request; the follow-up 429 is blocked locally)
+# PORT=5097 node backend/server.js  +  a scripted client
+#   200 with a real description (933 ms) / 429 + Retry-After /
+#   no key material or JWT secret in any body or log  -> exit 0
+
+# live degraded-path check (GROQ_API_KEY forced empty for the child process,
+# so no provider call can occur)
+# PORT=5098 node backend/server.js  +  a scripted client
+#   401 (no token) / 401 (malformed token) / 400 (empty title) /
+#   503 fallback (no key) / 429 + Retry-After / 404 (unknown /api/ai path) /
+#   401 on /tasks / logs contain error name+code only  -> exit 0
+
+# git hygiene used before each commit
+git diff --cached --check
+git diff --cached --stat
+git diff --numstat                                 # confirms pre-existing work untouched
+```
+
+---
+
+## 19. Git safety rules observed
+
+* No `reset --hard`, `clean`, `stash`, `restore`, `checkout`, `switch`, `amend`,
+  merge, rebase or force-push.
+* Nothing was staged with `git add .` / `git add -A`: every commit lists its
+  files explicitly.
+* Pre-existing modified and untracked work (job processing, security, e-mail,
+  rate limiter, debug controller, tests) was left exactly as found, including
+  `backend/package.json` with its uncommitted test scripts.
+* No `.env`, credential, `node_modules`, `dist` or test artifact was committed.
+* The database integration guard was never bypassed and no assertion was weakened.
+* Commits are local only; nothing was pushed.
+
+See `docs/practical-13-commit-audit.md` for the per-commit inventory.
