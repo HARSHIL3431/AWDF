@@ -1,28 +1,280 @@
-# Student Portfolio — Full Stack Task Manager
+ <div align="center">
 
-[![CI Pipeline](https://github.com/HARSHIL3431/AWDF/actions/workflows/ci.yml/badge.svg)](https://github.com/HARSHIL3431/AWDF/actions/workflows/ci.yml)
+# AWDF
 
-React + Express + MongoDB Atlas full-stack application.
+### Advanced Web Development Framework
 
-## Prerequisites
+**A full-stack task management application built with React, Express, and MongoDB.**
 
-- Node.js 18+
-- MongoDB Atlas cluster with IP whitelist enabled
+Manage tasks, explore secure authentication, background jobs, caching, and AI-powered task description generation.
 
-## Setup
+<br/>
 
-### Backend
+<a href="https://awdf-sooty.vercel.app/"><strong>🌐 Live Demo</strong></a>
+&nbsp; • &nbsp;
+<a href="https://github.com/HARSHIL3431/AWDF"><strong>📂 GitHub Repository</strong></a>
+
+<br/><br/>
+
+![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)
+![Node.js](https://img.shields.io/badge/Node.js-24-339933?style=for-the-badge&logo=node.js&logoColor=white)
+![Express](https://img.shields.io/badge/Express-Backend-000000?style=for-the-badge&logo=express&logoColor=white)
+![MongoDB](https://img.shields.io/badge/MongoDB-Database-47A248?style=for-the-badge&logo=mongodb&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-Frontend-646CFF?style=for-the-badge&logo=vite&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Containerized-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+
+</div>
+
+---
+
+## ✨ About the Project
+
+AWDF is a full-stack task management system developed as part of academic practical work in web development.
+
+The project brings together a modern frontend, REST API, database persistence, authentication, performance optimization, background processing, and AI integration in one application.
+
+<div align="center">
+
+| 📝 Task Management | 🔐 Authentication | ⚡ Performance | 🤖 AI Integration |
+|:---:|:---:|:---:|:---:|
+| Create and manage tasks | JWT-based authentication | In-memory caching | AI-generated descriptions |
+| CRUD operations | Password reset workflow | Cache invalidation | LLM provider integration |
+
+</div>
+
+## 🚀 Live Deployment
+
+<div align="center">
+
+| Component | Technology | Status |
+|:---|:---|:---|
+| Frontend | Vercel | 🌐 [Open Website](https://awdf-sooty.vercel.app/) |
+| Backend API | Render | Node.js / Express |
+| Database | MongoDB Atlas | Cloud Database |
+
+</div>
+
+## 🖥️ Application Preview
+
+> Add screenshots of your deployed application here to give visitors an immediate visual preview.
+
+<div align="center">
+
+<!-- Replace these placeholders with screenshots from your application -->
+
+<img src="docs/screenshots/dashboard.png" alt="AWDF dashboard preview" width="85%"/>
+
+<sub>AWDF application dashboard</sub>
+
+</div>
+
+## 🧩 Core Features
+
+<div align="center">
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+### 📋 Task Management
+
+- Create and manage tasks
+- Update task information
+- View task collections
+- Delete tasks
+- Persistent database storage
+
+</td>
+<td width="50%" valign="top">
+
+### 🔒 Secure Authentication
+
+- User registration and login
+- JWT-based authentication
+- Protected API endpoints
+- Password hashing
+- Password reset workflow
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+### ⚡ Performance
+
+- In-memory caching
+- Cache invalidation
+- Cache statistics
+- Reduced repeated database queries
+
+</td>
+<td width="50%" valign="top">
+
+### 🤖 AI Task Assistant
+
+- Generate task descriptions
+- Support for configured AI providers
+- Editable generated descriptions
+- Backend-managed API credentials
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+### 🔄 Background Processing
+
+- MongoDB-backed job queue
+- Asynchronous email processing
+- Retry handling
+- Dead-letter handling
+- Encrypted job payloads
+
+</td>
+<td width="50%" valign="top">
+
+### 🐳 Docker Support
+
+- Dockerized frontend and backend
+- Docker Compose
+- MongoDB container
+- Persistent database volume
+
+</td>
+</tr>
+</table>
+
+</div>
+
+## 🏗️ System Architecture
+
+```mermaid
+flowchart TB
+    User([User])
+
+    subgraph Frontend["Frontend · React + Vite"]
+        UI[Web Application]
+        ClientAPI[API Client]
+    end
+
+    subgraph Backend["Backend · Node.js + Express"]
+        API[REST API]
+        Auth[Authentication]
+        Tasks[Task Management]
+        Cache[Cache Service]
+        Jobs[Background Job Service]
+        AI[AI Description Service]
+    end
+
+    DB[(MongoDB)]
+    LLM[AI Provider]
+    Email[SMTP Email Service]
+
+    User --> UI
+    UI --> ClientAPI
+    ClientAPI --> API
+
+    API --> Auth
+    API --> Tasks
+    Tasks --> Cache
+    Tasks --> DB
+
+    API --> Jobs
+    Jobs --> DB
+    Jobs --> Email
+
+    API --> AI
+    AI --> LLM
+```
+
+## 🛠️ Technology Stack
+
+<div align="center">
+
+| Frontend | Backend | Database & Infrastructure |
+|:---:|:---:|:---:|
+| React | Node.js | MongoDB |
+| Vite | Express | MongoDB Atlas |
+| React Router | JWT | Docker |
+| Framer Motion | Mongoose | Docker Compose |
+| CSS | NodeCache | Vercel + Render |
+
+</div>
+
+## 📂 Project Structure
+
+```text
+AWDF/
+├── backend/
+│   ├── src/
+│   │   ├── config/
+│   │   ├── controllers/
+│   │   ├── middleware/
+│   │   ├── models/
+│   │   ├── routes/
+│   │   ├── services/
+│   │   ├── workers/
+│   │   └── security/
+│   ├── test/
+│   ├── server.js
+│   └── package.json
+│
+├── frontend/
+│   ├── src/
+│   ├── public/
+│   └── package.json
+│
+├── docs/
+│   ├── practical-8.md
+│   ├── practical-9.md
+│   ├── practical-10-events.md
+│   ├── practical-11-docker.md
+│   └── practical-13-ai-integration.md
+│
+├── docker-compose.yml
+└── README.md
+```
+
+## ⚙️ Run Locally
+
+### Prerequisites
+
+- Node.js
+- npm
+- MongoDB local instance or MongoDB Atlas
+- Git
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/HARSHIL3431/AWDF.git
+cd AWDF
+```
+
+### 2. Configure the backend
 
 ```bash
 cd backend
 npm install
-cp .env.example .env   # add your MONGO_URI
+```
+
+Create your local environment file:
+
+```bash
+cp .env.example .env
+```
+
+Configure your MongoDB URI and required secrets in `backend/.env`.
+
+### 3. Start the backend
+
+```bash
 npm run dev
 ```
 
-Server runs on `http://localhost:5000`.
+### 4. Start the frontend
 
-### Frontend
+Open a second terminal:
 
 ```bash
 cd frontend
@@ -30,371 +282,138 @@ npm install
 npm run dev
 ```
 
-Frontend runs on `http://localhost:5173`.
+Open the local frontend URL displayed by Vite.
 
-### Both (from root)
+## 🔑 Environment Configuration
 
-```bash
-npm run dev
-```
+Configure the environment variables required by the backend.
 
-## API Endpoints
+| Variable | Purpose |
+|:---|:---|
+| `MONGO_URI` | MongoDB connection string |
+| `JWT_SECRET` | JWT signing secret |
+| `PORT` | Backend port |
+| `NODE_ENV` | Application environment |
+| `JOB_PAYLOAD_ENCRYPTION_KEY` | Background job encryption key |
+| `FRONTEND_URL` | Frontend origin |
+| `EMAIL_HOST` | SMTP host |
+| `EMAIL_PORT` | SMTP port |
+| `EMAIL_USER` | Email account |
+| `EMAIL_PASSWORD` | Email account password |
+| `AI_PROVIDER` | Selected AI provider |
+| `GROQ_API_KEY` | Groq API credential |
 
-| Method | Endpoint            | Description                                  |
-|--------|---------------------|----------------------------------------------|
-| GET    | /tasks              | List all tasks (Cached with 60s TTL)         |
-| GET    | /tasks/:id          | Get task by ID (Cached)                      |
-| POST   | /tasks              | Create a task (Invalidates task list cache)  |
-| PUT    | /tasks/:id          | Update a task (Invalidates affected caches)  |
-| DELETE | /tasks/:id          | Delete a task (Invalidates affected caches)  |
-| GET    | /debug/cache-stats  | Cache statistics (hits, misses, hit rate)    |
-| GET    | /debug/jobs         | Job statistics (authenticated, aggregates)   |
-| POST   | /api/ai/generate-description | AI task-description suggestion (authenticated, rate-limited) |
+**Keep secrets in your local `.env` file or deployment environment settings. Never commit real credentials to GitHub.**
 
-## AI Task Description Generator (Practical 13)
+## 🐳 Docker
 
-Authenticated users can press **Generate description** on the task form; the
-backend asks a configured LLM for a 2-3 sentence suggestion that is placed in
-the **editable** description field. Nothing is saved until the user submits the
-form, and a visible disclaimer asks for review before use.
-
-- **Endpoint:** `POST /api/ai/generate-description` with `{ "title": "..." }`
-  (Bearer token required, `Content-Type: application/json`).
-  Returns `{ description, fallback, message }` on 200/503, `{ error }` on
-  400/401/429 (429 carries `Retry-After`).
-- **Providers:** Groq (default), OpenAI or Gemini, selected by `AI_PROVIDER`.
-  The call is made **server-side only** — the browser talks to our backend, and
-  no provider key ever reaches the frontend bundle, a URL, a log or a response.
-- **Environment variables** (backend `.env` only, never `VITE_*`, never commit
-  real values): `AI_PROVIDER`, `GROQ_API_KEY`, `GROQ_MODEL` (optional),
-  `OPENAI_API_KEY`, `OPENAI_MODEL` (optional), `GEMINI_API_KEY`,
-  `GEMINI_MODEL` (optional). With no key configured the feature degrades to a
-  friendly 503 fallback and task management keeps working.
-- **Rate limiting:** 1 request per task title per minute and 10 per account per
-  minute; input is validated and length-capped (title 200 chars, description
-  600 chars); provider calls time out after 8 s.
-- **Tests:** `backend/test/aiGeneration.test.js` — 26 cases, every provider call
-  mocked (no key, no network, no cost). Run with
-  `node --test "backend/test/aiGeneration.test.js"` or the whole suite via
-  `npm test`.
-
-Full design, contract, security notes and live-verification results:
-[docs/practical-13-ai-integration.md](docs/practical-13-ai-integration.md).
-
-## Asynchronous Job Processing (password-reset emails)
-
-Password-reset emails are delivered by a durable background-job workflow, not
-on the HTTP request path. `POST /forgot-password` saves the (SHA-256-hashed)
-reset token and enqueues an `email.password_reset` job in MongoDB, then returns
-the same generic response as before. An in-process worker claims jobs and sends
-the email through the existing SMTP configuration.
-
-This is a Mongo-backed durable job queue with event-driven dispatch inside the
-application process. It is **not** a message broker, microservice, or
-general-purpose event bus (no Redis/BullMQ/RabbitMQ/Kafka).
-
-### Encryption key setup
-
-Job payloads are encrypted with AES-256-GCM. The key must be exactly 64
-hexadecimal characters (32 bytes), provided via `JOB_PAYLOAD_ENCRYPTION_KEY`:
-
-```bash
-# Generate a key (never commit or share it)
-node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
-
-# backend/.env
-JOB_PAYLOAD_ENCRYPTION_KEY=<paste the generated 64-char hex value>
-```
-
-- The server **fails fast at startup** with a remediation message if the key is
-  missing or malformed. No key is ever auto-generated and there is no plaintext
-  fallback.
-- Keep the key stable across restarts; rotating it makes existing queued
-  payloads undecryptable (those jobs move to `dead`).
-- Never put the real key in `.env.example`, docs, logs, or source control.
-
-### How the queue and worker operate
-
-- `backend/src/models/jobModel.js` — job documents (`type`, `status`,
-  encrypted `payload` with `select:false`, `attempts`, `nextAttemptAt`,
-  `leaseUntil`, `correlationId`, sanitized `errorCategory`/`errorMessage`,
-  `expiresAt` for terminal jobs).
-- `backend/src/services/jobService.js` — enqueue, atomic claim
-  (`pending → processing` via guarded `findOneAndUpdate`), completion, retry
-  scheduling, dead-lettering, expired-lease recovery, aggregate statistics.
-- `backend/src/workers/emailWorker.js` — single sequential polling loop
-  (batch 5, poll interval 2s) started **only after MongoDB connects**; never at
-  module import. Stops claiming on shutdown.
-- `backend/src/security/payloadEncryption.js` — AES-256-GCM envelope
-  `{v, iv, tag, ct}` with purpose-bound AAD; a fresh random nonce per job.
-
-Job states and retry policy:
-
-```
-pending → processing → succeeded
-processing → pending   (retryable failure or expired-lease recovery)
-processing → dead      (attempts exhausted or non-retryable failure)
-```
-
-- Max attempts: 5; backoff `min(30s × 2^(n−1), 15min)` with jitter.
-- Lease: 120s (always greater than worst-case SMTP time of 50s:
-  connection 10s + greeting 10s + socket 30s), so live sends are never stolen.
-- Terminal jobs (`succeeded`/`dead`) are retained for **7 days** (`expiresAt`
-  TTL index), then deleted. Active jobs are never TTL-deleted.
-- **At-least-once delivery:** if SMTP accepts a message and the process crashes
-  before success is persisted, the retry can send a duplicate email with the
-  same (still valid) reset link. Exactly-once delivery is not claimed.
-
-### Rate limiting
-
-`POST /forgot-password` is limited to **5 requests per 15 minutes per IP**,
-keyed on the socket remote address (`X-Forwarded-For` is ignored because the
-app does not run behind a verified trusted proxy). Excess requests get
-`429 {"error":"Too many requests. Please try again later."}` with `Retry-After`.
-
-Known limitation: the limiter is **process-local** — counters reset on restart
-and are not shared across multiple instances. This is not distributed rate
-limiting. Other routes are unaffected.
-
-### Startup and shutdown
-
-1. Config loads; the encryption key is validated (fail-fast, exit 1 if bad).
-2. The HTTP server starts on the configured port (existing convention).
-3. On successful `mongoose.connect`, the worker starts polling.
-4. `SIGINT`/`SIGTERM`: the worker stops claiming new jobs and waits up to 10s
-   for the in-flight job, then the HTTP server and MongoDB connection close.
-   An undrained job stays `processing` and is reclaimed via lease expiry after
-   the next start. A safety net logs and exits on unhandled promise rejections.
-
-### Job statistics endpoint
-
-`GET /debug/jobs` (requires `Authorization: Bearer <JWT>`, same
-`authenticateToken` convention as `/debug/cache-stats`):
-
-```json
-{
-  "counts": { "pending": 0, "processing": 0, "succeeded": 0, "dead": 0, "total": 0 },
-  "queued": 0,
-  "processingCount": 0,
-  "deadCount": 0,
-  "oldestPendingAgeMs": null,
-  "enqueueFailures": 0
-}
-```
-
-It returns aggregates only — never payloads, tokens, emails, correlation IDs,
-raw error text, or encryption material.
-
-### Operational limitations
-
-- Enqueue failure policy: if the user update succeeds but the job insert fails,
-  the API still returns the generic accepted response (no synchronous email
-  fallback), records a sanitized `enqueueFailures` counter, and the user may
-  need to retry; the reset token simply expires after 15 minutes.
-- The rate limiter is in-process (see above).
-- Reset tokens are redacted from request/error logs
-  (`/reset-password/[REDACTED]`, 64-hex tokens, email addresses).
-
-## Docker (Practical 11)
-
-The whole stack — React frontend, Express backend and MongoDB — starts with one
-command from the repository root:
+Run the application using Docker Compose from the repository root:
 
 ```bash
 docker compose up --build
 ```
 
-| Service   | Container port | Host port | What runs inside                                  |
-|-----------|----------------|-----------|---------------------------------------------------|
-| `frontend`| 5173           | 5173      | `vite preview` serving the production bundle       |
-| `backend` | 5000           | 5000      | REST API (the browser-visible API endpoint)        |
-| `mongodb` | 27017          | 27017     | MongoDB 7 with the named volume `mongo_data`        |
-
-Prerequisite (identical to local development): `backend/.env` must exist —
-create it once from `backend/.env.example`. Compose overrides only
-`MONGO_URI=mongodb://mongodb:27017/task_manager` and `PORT=5000` inside the
-container, so the three services reach each other by Compose service name on
-the `app-network` bridge network.
-
-Host `node_modules`, `.env` and `.git` are excluded by the `.dockerignore`
-files, so no credentials and no host dependencies enter an image.
+Stop the services:
 
 ```bash
-docker compose ps            # service status and health
-docker compose logs -f backend
-docker compose stop          # stop containers, KEEP all MongoDB data
-docker compose down          # remove containers, KEEP the mongo_data volume
-docker compose down -v       # deletes the database volume — never part of setup
+docker compose down
 ```
 
-Details, verification results and troubleshooting:
-[docs/practical-11-docker.md](docs/practical-11-docker.md).
+> Database data is stored in a persistent Docker volume. Avoid deleting volumes unless you intentionally want to remove local database data.
 
-## Documentation
-- [Practical 8 Docs](docs/practical-8.md)
-- [Practical 9 In-Memory Caching & Query Optimization](docs/practical-9.md)
-- [Practical 10 Asynchronous Event-Driven Notifications](docs/practical-10-events.md)
-- [Practical 11 Docker Containerization & Compose](docs/practical-11-docker.md)
-- [Practical 13 Secure AI Task Description Generator](docs/practical-13-ai-integration.md)
+## 🧪 Testing & Quality
 
-## Running Tests
+Run backend tests:
 
 ```bash
-# Safe unit tests (node:test, no database, no SMTP, no network) — preferred
 cd backend
 npm test
-
-# Integration tests (real MongoDB): ONLY run after configuring AND approving
-# an isolated test database (see below). Refuse to run otherwise.
-npm run test:integration
-
-# Ad-hoc integration scripts: require a RUNNING server and mutate real
-# dev/Atlas state. Do not run them without explicit authorization.
-node test_backend.js       # Practical 7 & Auth tests
-node test_practical9.js    # Practical 9 Cache & Benchmark tests
-node test_practical10.js   # Practical 10 event-driven notification demo
-
-# Frontend lint
-cd frontend && npm run lint
 ```
 
-Test suite coverage: encryption round-trip/tampering/purpose/key handling,
-job lifecycle (enqueue, atomic claim, retry, dead-letter, lease recovery,
-retention), worker (success/retry/shutdown/recovery), forgot-password response
-contract and enumeration safety, rate-limit boundaries, log-token redaction,
-authenticated job statistics, login/register/reset regression checks, and the
-database-guard refusal matrix.
-
-### Integration tests (isolated database required)
-
-`backend/test/integration/` exercises real MongoDB persistence, concurrent
-atomic claiming, retry/dead-letter/lease recovery, the worker's graceful
-shutdown, forgot-password end-to-end compatibility, and the statistics
-endpoint. Email transport is mocked everywhere — no real email is ever sent.
-
-They are hard-gated by `backend/test/helpers/dbGuard.js`, which **refuses to
-run (before any connection) unless an isolated test database is explicitly
-configured and approved**. Required `backend/.env` configuration:
+Run frontend linting:
 
 ```bash
-RUN_INTEGRATION_TESTS=1
-TEST_MONGO_URI=mongodb://<user>:<password>@<host>:27017/task_manager_test?authSource=admin
+cd frontend
+npm run lint
 ```
 
-Enforced rules: `TEST_MONGO_URI` is never read by the application (the app
-uses `MONGO_URI`); its database name must match `<name>_test` and differ from
-the development database; the two URIs must differ; `NODE_ENV` must not be
-`production`; after connecting, the live database name is re-verified and the
-connection is closed immediately on any mismatch. Destructive operations are
-limited to `deleteMany` on `jobs`/`users` inside the verified test database —
-no drops. Remove `RUN_INTEGRATION_TESTS=1` afterwards to disable the suite.
-The database must belong to you (or a disposable local instance, e.g.
-`mongod` locally or a separate Atlas cluster); using a production or shared
-dev database is refused by the guard.
-
-## Deployment (free hosting: Vercel + Render + MongoDB Atlas)
-
-Topology in production — identical to local, only the hosts change:
-
-```
-Browser  ->  https://<frontend>.vercel.app            (static Vite build)
-         ->  https://<backend>.onrender.com           (Express API + in-process email worker)
-Backend  ->  mongodb+srv://... (MongoDB Atlas M0 free tier)
-```
-
-The backend binds `process.env.PORT` on all interfaces (`app.listen(port)`
-with no host argument), which is exactly what Render requires. `GET /health`
-answers `200 {"status":"ok"}` with no auth, no DB dependency and no secrets —
-use it as the Render health-check path.
-
-### 1. MongoDB Atlas (database)
-
-1. Create a free **M0** cluster at cloud.mongodb.com.
-2. Create a database user (username + password, e.g. readWrite on any DB).
-3. Network Access: allow the Render egress (its free instances use dynamic
-   IPs, so `0.0.0.0/0` is the practical choice; Atlas will warn — accept it).
-4. Copy the SRV connection string (`mongodb+srv://<user>:<pass>@.../task_manager?authSource=admin`)
-   — this exact value becomes `MONGO_URI` on Render. Never commit it.
-
-### 2. Backend on Render (web service)
-
-Dashboard settings:
-
-| Setting | Value |
-|---|---|
-| Root Directory | `backend` |
-| Build Command | `npm install` |
-| Start Command | `npm start`  (= `node server.js`) |
-| Node version | 20 or newer (22/24 LTS recommended; verified locally on Node 24) |
-| Health Check Path | `/health` |
-
-Environment variables (Render → Environment, add all; **set values there, never
-in git**):
-
-| Variable | Required | Value / notes |
-|---|---|---|
-| `NODE_ENV` | yes | `production` |
-| `MONGO_URI` | yes | the Atlas SRV string from step 1 |
-| `JWT_SECRET` | yes | strong random, e.g. `openssl rand -hex 32` (PowerShell: `[guid]::NewGuid().ToString('N')+[guid]::NewGuid().ToString('N')`) |
-| `JOB_PAYLOAD_ENCRYPTION_KEY` | yes | **exactly 64 hex chars** — the server refuses to start without it. Generate: `openssl rand -hex 32` |
-| `FRONTEND_URL` | yes | `https://<frontend>.vercel.app` (used to build password-reset links in emails) |
-| `EMAIL_HOST` | for password-reset emails | `smtp.gmail.com` (or your SMTP host) |
-| `EMAIL_PORT` | for password-reset emails | `587` |
-| `EMAIL_USER` | for password-reset emails | SMTP account |
-| `EMAIL_PASSWORD` | for password-reset emails | SMTP app password |
-| `AI_PROVIDER` | no | `groq` (default behaviour) |
-| `GROQ_API_KEY` | no | Groq key; without it the AI feature degrades to the documented 503 fallback |
-| `GROQ_MODEL` | no | `qwen/qwen3.8-27b` (availability varies per key) |
-| `CORS_ORIGIN` | no | `https://<frontend>.vercel.app` — recommended hardening; unset keeps the historical `*` |
-| `PORT` | no | Render injects it automatically; the server reads it |
-
-Commands (equivalent to the dashboard settings, run inside `backend/`):
+Build the frontend:
 
 ```bash
-npm install      # build
-npm start        # start (node server.js)
+npm run build
 ```
 
-### 3. Frontend on Vercel
+## 📚 Academic Practicals
 
-Dashboard settings:
+AWDF includes practical documentation exploring full-stack development topics.
 
-| Setting | Value |
-|---|---|
-| Root Directory | `frontend` |
-| Framework Preset | Vite (auto-detected) |
-| Build Command | `npm run build` (= `vite build`) |
-| Output Directory | `dist` (auto-detected) |
+<div align="center">
 
-Environment variables (Vercel → Settings → Environment Variables, **build
-time** — Vite inlines every `VITE_*` value into the public bundle):
+| Practical | Topic |
+|:---:|:---|
+| 08 | Web application implementation |
+| 09 | Caching and performance optimization |
+| 10 | Event-driven processing and background jobs |
+| 11 | Docker and containerization |
+| 13 | AI-powered task description generation |
 
-| Variable | Required | Notes |
-|---|---|---|
-| `VITE_API_URL` | yes | `https://<backend>.onrender.com` (no trailing slash) |
-| `VITE_GITHUB_USERNAME` | no | portfolio pages work without it |
-| `VITE_GITHUB_TOKEN` | no | **ends up in the public bundle by design of `VITE_*`** — if used, make it a fine-grained token with read-only access to public data only, or leave it unset (unauthenticated GitHub API: 60 req/h per IP) |
+</div>
 
-Commands (equivalent to the dashboard settings, run inside `frontend/`):
+Detailed documentation is available in the [`docs/`](./docs/) directory.
 
-```bash
-npm install      # install
-npm run build    # vite build -> dist/
+## ☁️ Deployment
+
+The application is deployed using a cloud-based architecture:
+
+```mermaid
+flowchart LR
+    Browser([Browser])
+    Vercel["Vercel<br/>React Frontend"]
+    Render["Render<br/>Express API"]
+    Atlas[("MongoDB Atlas<br/>Database")]
+
+    Browser --> Vercel
+    Vercel -->|HTTPS API requests| Render
+    Render --> Atlas
 ```
 
-`frontend/vercel.json` provides the SPA rewrite to `index.html`, so deep links
-such as `/reset-password/:token` (the link inside reset e-mails) resolve
-instead of returning 404.
+### Deployment Platforms
 
-### 4. Free-tier caveats
+| Platform | Responsibility |
+|:---|:---|
+| [Vercel](https://vercel.com/) | Frontend hosting |
+| [Render](https://render.com/) | Backend hosting |
+| [MongoDB Atlas](https://www.mongodb.com/atlas) | Cloud database |
 
-* Render free web services **spin down after inactivity** — the first request
-  after idle takes ~30–60 s; subsequent ones are fast. The Atlas connection is
-  re-established on wake; the email worker starts after the DB connects.
-* One instance only: the in-process cache, rate limiters and the email worker
-  are per-process, which is consistent with a single instance.
-* After the first successful deploys, set `FRONTEND_URL` and (optionally)
-  `CORS_ORIGIN` on Render to the final Vercel domain, and redeploy the
-  frontend if `VITE_API_URL` changed (VITE values are baked at build time).
+## 🎓 Learning Outcomes
 
+Through this project, the following concepts are practiced:
 
+- Full-stack application development
+- REST API design and implementation
+- Database integration
+- Authentication and security
+- Caching and performance
+- Asynchronous job processing
+- AI API integration
+- Automated testing
+- Docker containerization
+- Cloud deployment
+
+---
+
+<div align="center">
+
+### Built with ❤️ for Advanced Web Development Framework
+
+**Harshil Thakkar**
+
+B.Tech · Artificial Intelligence & Machine Learning
+
+<br/>
+
+<a href="https://awdf-sooty.vercel.app/">
+  <img src="https://img.shields.io/badge/Explore%20AWDF-Live%20Demo-00C853?style=for-the-badge" alt="Explore AWDF"/>
+</a>
+
+</div>
