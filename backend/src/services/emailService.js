@@ -1,4 +1,6 @@
 import nodemailer from 'nodemailer';
+import { SMTP_TIMEOUTS } from '../config/jobConfig.js';
+import { redactText } from '../security/redaction.js';
 
 const createTransporter = () => {
   const isProduction = process.env.NODE_ENV === 'production';
@@ -13,12 +15,28 @@ const createTransporter = () => {
     tls: {
       rejectUnauthorized: isProduction,
       minVersion: 'TLSv1.2'
-    }
+    },
+    // Bounded timeouts (verified against installed nodemailer 10.0.10 option
+    // names): worst-case single send = 10s connection + 10s greeting + 30s
+    // socket inactivity = 50s, always below the 120s job lease.
+    connectionTimeout: SMTP_TIMEOUTS.connectionTimeout,
+    greetingTimeout: SMTP_TIMEOUTS.greetingTimeout,
+    socketTimeout: SMTP_TIMEOUTS.socketTimeout
   });
 };
 
+// One shared transporter for the process: SMTP config is static, and reusing
+// the connection pool avoids a fresh TLS/auth handshake per email job.
+let sharedTransporter = null;
+const getTransporter = () => {
+  if (sharedTransporter === null) {
+    sharedTransporter = createTransporter();
+  }
+  return sharedTransporter;
+};
+
 export const sendPasswordResetEmail = async (email, resetToken, frontendUrl) => {
-  const transporter = createTransporter();
+  const transporter = getTransporter();
 
   const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
 
@@ -84,7 +102,8 @@ Task Manager Team
     await transporter.sendMail(mailOptions);
     return { success: true };
   } catch (error) {
-    console.error('Email sending failed:', error.message);
-    return { success: false, error: error.message };
+    // Sanitized: SMTP errors can embed the recipient address; never log tokens/URLs.
+    console.error('Email sending failed:', redactText(String(error?.message ?? error)));
+    return { success: false, error: redactText(String(error?.message ?? error)) };
   }
 };

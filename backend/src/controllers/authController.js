@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import User from '../models/userModel.js';
 import { config } from '../config/config.js';
-import { sendPasswordResetEmail } from '../services/emailService.js';
+import { jobService } from '../services/jobService.js';
 
 export const authController = {
   // POST /register
@@ -152,13 +152,23 @@ export const authController = {
       user.resetPasswordExpires = expires;
       await user.save();
 
-      // Send reset email
+      // Enqueue durable background delivery. The HTTP response no longer
+      // waits for SMTP. The raw token leaves the request path only inside the
+      // AES-256-GCM-encrypted job payload (never plaintext, never logged).
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-      const emailResult = await sendPasswordResetEmail(user.email, resetToken, frontendUrl);
-
-      if (!emailResult.success) {
-        // Don't reveal email failure to user, but log it
-        console.error('Failed to send password reset email:', emailResult.error);
+      const correlationId = typeof req.correlationId === 'string' ? req.correlationId : undefined;
+      try {
+        await jobService.enqueuePasswordReset(
+          { email: user.email, resetToken, frontendUrl },
+          { correlationId }
+        );
+      } catch (error) {
+        // Approved enqueue-failure policy: no synchronous SMTP fallback. Record
+        // a sanitized operational failure (counter + redacted log, no token /
+        // URL / email / key) and still return the generic accepted response.
+        // The user may need to retry the request; the reset token hash simply
+        // expires after 15 minutes.
+        jobService.noteEnqueueFailure(error, correlationId);
       }
 
       res.status(200).json(genericResponse);
