@@ -4,9 +4,9 @@
  * Security and privacy rules enforced here (see docs/practical-13-ai-integration.md):
  *
  *  - The provider key is read ONLY from a backend environment variable
- *    (OPENAI_API_KEY / GEMINI_API_KEY). It is never a VITE_* variable, never
- *    returned to a client, never placed in a URL query string, and never
- *    written to a log.
+ *    (GROQ_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY). It is never a VITE_*
+ *    variable, never returned to a client, never placed in a URL query string,
+ *    and never written to a log.
  *  - The ONLY application data sent to a provider is the task title the user
  *    just typed. No user records, e-mail addresses, tokens, task lists or
  *    unrelated configuration leave the process.
@@ -64,17 +64,22 @@ const SYSTEM_PROMPT = [
 ].join(' ');
 
 /**
- * Providers are described declaratively so both stay symmetric: build the
+ * Providers are described declaratively so all stay symmetric: build the
  * request (key travels in a HEADER, never the URL) and parse the response.
+ *
+ * OpenAI and Groq speak the same chat-completions protocol (Groq is explicitly
+ * OpenAI-compatible), so they share one factory that differs only in endpoint,
+ * key variable and default model. Gemini has its own wire format and stays a
+ * separate entry.
  */
-const PROVIDERS = {
-  openai: {
-    keyEnv: 'OPENAI_API_KEY',
-    modelEnv: 'OPENAI_MODEL',
-    defaultModel: 'gpt-4o-mini',
+function openAiCompatibleProvider({ keyEnv, modelEnv, defaultModel, url }) {
+  return {
+    keyEnv,
+    modelEnv,
+    defaultModel,
     buildRequest({ key, model, title }) {
       return {
-        url: 'https://api.openai.com/v1/chat/completions',
+        url,
         headers: {
           'Content-Type': 'application/json',
           // Key in the Authorization header: never logged, never in a URL.
@@ -95,7 +100,25 @@ const PROVIDERS = {
       const content = data?.choices?.[0]?.message?.content;
       return typeof content === 'string' ? content : null;
     },
-  },
+  };
+}
+
+const PROVIDERS = {
+  groq: openAiCompatibleProvider({
+    keyEnv: 'GROQ_API_KEY',
+    modelEnv: 'GROQ_MODEL',
+    // qwen over the docs' llama default: llama-3.3-70b-versatile answered
+    // 404 model_not_found for the configured key (availability varies per
+    // key/plan); GROQ_MODEL overrides this when needed.
+    defaultModel: 'qwen/qwen3.8-27b',
+    url: 'https://api.groq.com/openai/v1/chat/completions',
+  }),
+  openai: openAiCompatibleProvider({
+    keyEnv: 'OPENAI_API_KEY',
+    modelEnv: 'OPENAI_MODEL',
+    defaultModel: 'gpt-4o-mini',
+    url: 'https://api.openai.com/v1/chat/completions',
+  }),
   gemini: {
     keyEnv: 'GEMINI_API_KEY',
     modelEnv: 'GEMINI_MODEL',

@@ -49,6 +49,37 @@ npm run dev
 | DELETE | /tasks/:id          | Delete a task (Invalidates affected caches)  |
 | GET    | /debug/cache-stats  | Cache statistics (hits, misses, hit rate)    |
 | GET    | /debug/jobs         | Job statistics (authenticated, aggregates)   |
+| POST   | /api/ai/generate-description | AI task-description suggestion (authenticated, rate-limited) |
+
+## AI Task Description Generator (Practical 13)
+
+Authenticated users can press **Generate description** on the task form; the
+backend asks a configured LLM for a 2-3 sentence suggestion that is placed in
+the **editable** description field. Nothing is saved until the user submits the
+form, and a visible disclaimer asks for review before use.
+
+- **Endpoint:** `POST /api/ai/generate-description` with `{ "title": "..." }`
+  (Bearer token required, `Content-Type: application/json`).
+  Returns `{ description, fallback, message }` on 200/503, `{ error }` on
+  400/401/429 (429 carries `Retry-After`).
+- **Providers:** Groq (default), OpenAI or Gemini, selected by `AI_PROVIDER`.
+  The call is made **server-side only** — the browser talks to our backend, and
+  no provider key ever reaches the frontend bundle, a URL, a log or a response.
+- **Environment variables** (backend `.env` only, never `VITE_*`, never commit
+  real values): `AI_PROVIDER`, `GROQ_API_KEY`, `GROQ_MODEL` (optional),
+  `OPENAI_API_KEY`, `OPENAI_MODEL` (optional), `GEMINI_API_KEY`,
+  `GEMINI_MODEL` (optional). With no key configured the feature degrades to a
+  friendly 503 fallback and task management keeps working.
+- **Rate limiting:** 1 request per task title per minute and 10 per account per
+  minute; input is validated and length-capped (title 200 chars, description
+  600 chars); provider calls time out after 8 s.
+- **Tests:** `backend/test/aiGeneration.test.js` — 26 cases, every provider call
+  mocked (no key, no network, no cost). Run with
+  `node --test "backend/test/aiGeneration.test.js"` or the whole suite via
+  `npm test`.
+
+Full design, contract, security notes and live-verification results:
+[docs/practical-13-ai-integration.md](docs/practical-13-ai-integration.md).
 
 ## Asynchronous Job Processing (password-reset emails)
 
@@ -204,6 +235,7 @@ Details, verification results and troubleshooting:
 - [Practical 9 In-Memory Caching & Query Optimization](docs/practical-9.md)
 - [Practical 10 Asynchronous Event-Driven Notifications](docs/practical-10-events.md)
 - [Practical 11 Docker Containerization & Compose](docs/practical-11-docker.md)
+- [Practical 13 Secure AI Task Description Generator](docs/practical-13-ai-integration.md)
 
 ## Running Tests
 

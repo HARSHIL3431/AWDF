@@ -126,6 +126,17 @@ const GEMINI_OK = {
   candidates: [{ content: { parts: [{ text: 'Back up the database and test that the restore works.' }] } }],
 };
 
+const GROQ_OK = {
+  choices: [
+    {
+      message: {
+        role: 'assistant',
+        content: '  "Draft the weekly status report and share it with the team every Friday."  ',
+      },
+    },
+  ],
+};
+
 // ==========================================================================
 // Provider service
 // ==========================================================================
@@ -186,10 +197,41 @@ test('ai: the Gemini provider is selected by configuration and also keeps its ke
   assert.equal(result.description, 'Back up the database and test that the restore works.');
 });
 
+test('ai: the Groq provider is selected by configuration and keeps its key in a header', async () => {
+  const fetchImpl = recordingFetch(providerJson(200, GROQ_OK));
+
+  const result = await generateDescription({
+    title: 'Draft the weekly status report',
+    env: { AI_PROVIDER: 'groq', GROQ_API_KEY: FAKE_KEY },
+    fetchImpl,
+  });
+
+  assert.equal(result.provider, 'groq');
+  const { url, opts } = fetchImpl.calls[0];
+  assert.equal(url, 'https://api.groq.com/openai/v1/chat/completions');
+  assert.ok(!url.includes(FAKE_KEY), 'key never appears in the URL');
+  assert.equal(opts.headers.Authorization, `Bearer ${FAKE_KEY}`, 'key travels in the Authorization header');
+  const wire = opts.body;
+  assert.ok(!wire.includes(FAKE_KEY), 'key never enters the request body');
+  assert.equal(
+    JSON.parse(wire).messages.at(-1).content,
+    'Task title: Draft the weekly status report',
+    'the title is normalized and is the only user data sent'
+  );
+  assert.equal(
+    result.description,
+    'Draft the weekly status report and share it with the team every Friday.',
+    'wrapping quotes and extra whitespace are cleaned'
+  );
+});
+
 test('ai: a missing API key fails closed before any network request (the graceful-fallback path)', async () => {
   const fetchImpl = recordingFetch(providerJson(200, OPENAI_OK));
   const envs = [
     {},
+    { AI_PROVIDER: 'groq' },
+    { AI_PROVIDER: 'groq', GROQ_API_KEY: '' },
+    { AI_PROVIDER: 'groq', GROQ_API_KEY: '   ' },
     { AI_PROVIDER: 'openai' },
     { AI_PROVIDER: 'openai', OPENAI_API_KEY: '' },
     { AI_PROVIDER: 'openai', OPENAI_API_KEY: '   ' },
@@ -758,13 +800,13 @@ test('ai: the frontend never calls a provider directly and never carries a provi
       }
       if (!/\.(js|jsx|mjs|ts|tsx)$/.test(entry.name)) continue;
       const text = readFileSync(full, 'utf8');
-      if (/https?:\/\/(api\.openai\.com|generativelanguage\.googleapis\.com)/i.test(text)) {
+      if (/https?:\/\/(api\.openai\.com|api\.groq\.com|generativelanguage\.googleapis\.com)/i.test(text)) {
         offenders.push(`${full}: direct provider endpoint`);
       }
-      if (/VITE_[A-Z0-9_]*(OPENAI|GEMINI|ANTHROPIC)/i.test(text)) {
+      if (/VITE_[A-Z0-9_]*(OPENAI|GEMINI|GROQ|ANTHROPIC)/i.test(text)) {
         offenders.push(`${full}: provider key exposed as a VITE_ variable`);
       }
-      if (/\bOPENAI_API_KEY\b|\bGEMINI_API_KEY\b/.test(text)) {
+      if (/\bOPENAI_API_KEY\b|\bGEMINI_API_KEY\b|\bGROQ_API_KEY\b/.test(text)) {
         offenders.push(`${full}: backend key name referenced in browser code`);
       }
     }
